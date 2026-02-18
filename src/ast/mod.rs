@@ -1,5 +1,6 @@
-use anyhow::Result;
+use anyhow::{Result, ensure};
 use std::{collections::HashMap, fmt::Display, rc::Rc};
+pub mod parser;
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum ExprType {
@@ -20,6 +21,13 @@ impl ExprType {
             _ => false,
         }
     }
+    pub const fn binary(&self) -> bool {
+        use ExprType::*;
+        match self {
+            AND | OR | XOR | EQUIV | IMPL => true,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -36,6 +44,32 @@ pub struct Node {
 }
 
 impl Node {
+    pub fn new(expr_type: ExprType, arguments: Arguments) -> Node {
+        return Self {
+            expr_type: expr_type,
+            arguments: arguments,
+        };
+    }
+
+    pub fn new_var(name: &str) -> Self {
+        return Self::new(ExprType::VAR, Arguments::Literal(name.to_owned()));
+    }
+
+    pub fn new_not(argument: Node) -> Self {
+        return Self {
+            expr_type: ExprType::NOT,
+            arguments: Arguments::Unary(Rc::new(argument)),
+        };
+    }
+
+    pub fn new_binary(expr_type: ExprType, lhs: Node, rhs: Node) -> Result<Self> {
+        ensure!(expr_type.binary());
+        return Ok(Self {
+            expr_type: expr_type,
+            arguments: Arguments::Binary(Rc::new(lhs), Rc::new(rhs)),
+        });
+    }
+
     fn _impl_harvest_variables(&self) -> Vec<String> {
         let mut v: Vec<String> = Vec::new();
 

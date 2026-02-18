@@ -4,9 +4,15 @@ use itertools::Itertools;
 use std::rc::Rc;
 
 pub struct Inference {
-    antecedent: Rc<Vec<Node>>,
-    consequent: Rc<Node>,
+    pub antecedent: Rc<Vec<Node>>,
+    pub consequent: Rc<Node>,
 }
+
+pub struct InferenceRule {
+    rule: Inference,
+    name: String,
+}
+
 /// Return type: Vec<Vec<(metavar, objvar)>>
 /// Meaning metavar.replace(mapping) gives the new objvar
 fn generate_variable_mapping_permutations(
