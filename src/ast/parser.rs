@@ -1,131 +1,101 @@
-use std::vec::IntoIter;
-
-use crate::ast::{self, Node};
 use anyhow::{Result, bail};
-use itertools::{Itertools, MultiPeek};
+use comemo::{Tracked, memoize, track};
+use pest::Parser;
+use pest::iterators::Pairs;
+use pest::pratt_parser::PrattParser;
+use std::{fmt::Display, sync::LazyLock};
 
-#[derive(Debug)]
-enum Token {
-    LParen,
-    RParen,
-    Var(String),
-    Not,
-    And,
-    Or,
-    Xor,
-    Impl,
-    Equiv,
-    Top,
-    Bottom,
+use crate::ast::{BinaryRelation, Expression};
+#[derive(pest_derive::Parser)]
+#[grammar = "proplog.pest"]
+struct FatParser;
+
+static PRATT_PARSER: LazyLock<PrattParser<Rule>> = LazyLock::new(|| {
+    use Rule::*;
+    use pest::pratt_parser::{Assoc::*, Op};
+
+    // Precedence is defined lowest to highest
+    PrattParser::new()
+        .op(Op::infix(and, Left) | Op::infix(or, Left))
+        .op(Op::infix(implies, Left) | Op::infix(equiv, Left) | Op::infix(xor, Left))
+        .op(Op::prefix(negation))
+});
+
+#[derive(Clone, Hash, Debug)]
+pub struct ParsingError {
+    pub message: String,
 }
 
-impl Token {
-    const fn is_binary_operation(&self) -> bool {
-        use Token::*;
-        matches!(self, And | Or | Xor | Impl | Equiv)
+impl From<anyhow::Error> for ParsingError {
+    fn from(value: anyhow::Error) -> Self {
+        return ParsingError {
+            message: value.to_string(),
+        };
     }
 }
 
-fn take_until_expr_closed(token_stream: &mut MultiPeek<IntoIter<Token>>) -> Result<Vec<Token>> {
-    let mut counter = 0;
-    let mut result: Vec<Token> = vec![];
-    for token in token_stream.by_ref() {
-        match token {
-            Token::LParen => {
-                counter += 1;
-                result.push(token);
-            }
-            Token::RParen => {
-                counter -= 1;
-                result.push(token);
-            }
-            _ => {
-                result.push(token);
-            }
-        }
-        if counter == 0 {
-            return Ok(result);
-        }
+impl std::error::Error for ParsingError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        None
     }
 
-    bail!("Unclosed brackets");
-}
-
-fn tokenize(expr: &str) -> Result<MultiPeek<IntoIter<Token>>> {
-    let mut ret: Vec<Token> = vec![];
-    let chars = expr.chars();
-    for char in chars {
-        match char {
-            '(' => ret.push(Token::LParen),
-            ')' => ret.push(Token::RParen),
-            'v' => ret.push(Token::Or),
-            '^' => ret.push(Token::And),
-            '+' => ret.push(Token::Xor),
-            '>' => ret.push(Token::Impl),
-            '!' => ret.push(Token::Not),
-            '=' => ret.push(Token::Equiv),
-            '0' => ret.push(Token::Bottom),
-            '1' => ret.push(Token::Top),
-            ' ' => continue,
-            'A'..='Z' => ret.push(Token::Var(char.to_string())),
-            _ => {
-                bail!("Unexpected token {}", char)
-            }
-        }
+    fn description(&self) -> &str {
+        "description() is deprecated; use Display"
     }
 
-    Ok(ret.into_iter().multipeek())
-}
-
-/// Expressions need to be bracketed
-fn expr(token_stream: &mut MultiPeek<IntoIter<Token>>) -> Result<Node> {
-    if let Some(c) = token_stream.next() {
-        match c {
-            Token::LParen => {
-                let temp = take_until_expr_closed(token_stream)?;
-                if let Some(tk) = token_stream.next()
-                    && tk.is_binary_operation()
-                {
-                    let lhs = expr(&mut temp.into_iter().multipeek())?;
-                    let rhs = expr(token_stream)?;
-                    match tk {
-                        Token::And => {
-                            return Node::new_binary(ast::ExprType::And, lhs, rhs);
-                        }
-                        Token::Or => {
-                            return Node::new_binary(ast::ExprType::Or, lhs, rhs);
-                        }
-                        Token::Xor => {
-                            return Node::new_binary(ast::ExprType::Xor, lhs, rhs);
-                        }
-                        Token::Impl => {
-                            return Node::new_binary(ast::ExprType::Impl, lhs, rhs);
-                        }
-                        Token::Equiv => {
-                            return Node::new_binary(ast::ExprType::Equiv, lhs, rhs);
-                        }
-                        _ => {
-                            bail!("Expected binary operation")
-                        }
-                    }
-                }
-                return expr(&mut temp.into_iter().multipeek());
-            }
-
-            Token::Not => return Ok(Node::new_not(expr(token_stream)?)),
-
-            Token::Var(name) => return Ok(Node::new_var(name.as_str())),
-
-            _ => {
-                bail!("Unexpected token")
-            }
-        }
+    fn cause(&self) -> Option<&dyn std::error::Error> {
+        self.source()
     }
-    bail!("Expected left parenthesis, unary expression or literal.")
 }
 
-pub fn parse_expression(expression: &str) -> Result<Node> {
-    expr(&mut tokenize(expression)?)
+impl Display for ParsingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Error while parsing: {}", self.message)
+    }
+}
+
+fn parse_proposition(pairs: Pairs<Rule>) -> Result<Expression> {
+    PRATT_PARSER
+        .map_primary(|primary| {
+            Ok(match primary.as_rule() {
+                Rule::literal => Expression::Literal(primary.to_string()), // TODO: Check if to_string() and as_str() work the same way here
+                Rule::variable => Expression::Variable(primary.to_string()),
+                Rule::prop => parse_proposition(primary.into_inner())?,
+                rule => bail!("Expr::parse expected atom, found {:?}", rule),
+            })
+        })
+        .map_infix(|lhs, op, rhs| {
+            let op = match op.as_rule() {
+                Rule::and => BinaryRelation::And,
+                Rule::or => BinaryRelation::Or,
+                Rule::implies => BinaryRelation::Impl,
+                Rule::equiv => BinaryRelation::Equiv,
+                Rule::xor => BinaryRelation::Xor,
+                rule => bail!("Expr::parse expected infix operation, found {:?}", rule),
+            };
+            Ok(Expression::BinaryRelation {
+                lhs: Box::new(lhs?),
+                relation: op,
+                rhs: Box::new(rhs?),
+            })
+        })
+        .map_prefix(|op, rhs| match op.as_rule() {
+            Rule::negation => Ok(Expression::Negation(Box::new(rhs?))),
+            _ => unreachable!(),
+        })
+        .parse(pairs)
+}
+
+fn wrap_parse_expression(expr: &str) -> anyhow::Result<Expression> {
+    let mut result = FatParser::parse(Rule::expr, expr)?;
+    parse_proposition(result.next().unwrap().into_inner())
+}
+
+#[memoize]
+pub fn parse_expression(expr: &str) -> Result<Expression, ParsingError> {
+    wrap_parse_expression(expr).map_err(|e| ParsingError {
+        message: e.to_string(),
+    })
 }
 
 #[cfg(test)]
@@ -133,46 +103,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn basic_literal_parse() {
-        assert_eq!(parse_expression("A").unwrap(), Node::new_var("A"))
-    }
-
-    #[test]
-    fn expr_parse() {
+    fn variable_names() {
         assert_eq!(
-            parse_expression("(A v B)").unwrap(),
-            Node::new_binary(ast::ExprType::Or, Node::new_var("A"), Node::new_var("B")).unwrap()
-        );
-        assert_eq!(
-            parse_expression("((A v B) > C)").unwrap(),
-            Node::new_binary(
-                ast::ExprType::Impl,
-                Node::new_binary(ast::ExprType::Or, Node::new_var("A"), Node::new_var("B"))
-                    .unwrap(),
-                Node::new_var("C")
-            )
-            .unwrap()
-        );
-        assert_eq!(
-            parse_expression("((A v B) > C)").unwrap(),
-            Node::new_binary(
-                ast::ExprType::Impl,
-                Node::new_binary(ast::ExprType::Or, Node::new_var("A"), Node::new_var("B"))
-                    .unwrap(),
-                Node::new_var("C")
-            )
-            .unwrap()
-        );
-    }
-    #[test]
-    fn redundant_parens() {
-        assert_eq!(parse_expression("((((A))))").unwrap(), Node::new_var("A"))
-    }
-    #[test]
-    fn all_symbols_nothrow() {
-        println!(
-            "{}",
-            parse_expression("((((AvB)^(C))>(D))=!!(A+B)))").unwrap()
-        );
+            parse_expression("AvB").unwrap(),
+            Expression::BinaryRelation {
+                lhs: Box::new(Expression::Variable("A".to_string())),
+                relation: BinaryRelation::Or,
+                rhs: Box::new(Expression::Variable("B".to_string()))
+            }
+        )
     }
 }

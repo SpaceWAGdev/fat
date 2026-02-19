@@ -1,15 +1,12 @@
-use crate::{
-    ast::Node,
-    proof::ProofStep,
-};
+use crate::{ast::Expression, proof::ProofStep};
 use anyhow::{Result, bail};
 use itertools::Itertools;
-use std::{iter::zip, rc::Rc};
+use std::{collections::HashMap, iter::zip, rc::Rc};
 
 #[derive(Debug)]
 pub struct Inference {
-    pub antecedent: Rc<Vec<Node>>,
-    pub consequent: Rc<Node>,
+    pub antecedent: Vec<Expression>,
+    pub consequent: Box<Expression>,
 }
 #[derive(Debug)]
 pub struct InferenceRule {
@@ -31,39 +28,39 @@ impl TryFrom<&ProofStep> for Inference {
                 expression,
                 rule_name: _,
             } => Ok(Inference {
-                antecedent: Rc::new(
-                    antecedents
-                        .iter()
-                        .map(|step| match step.as_ref() {
-                            ProofStep::Axiom(node) => node.to_owned(),
-                            ProofStep::Subproof(proof) => proof.get_concluding_expr(),
-                            ProofStep::Inference {
-                                antecedents: _,
-                                expression,
-                                rule_name: _,
-                            } => expression.to_owned(),
-                        })
-                        .collect_vec(),
-                ),
-                consequent: Rc::new(expression.to_owned()),
+                antecedent: antecedents
+                    .iter()
+                    .map(|step| match step.as_ref() {
+                        ProofStep::Axiom(node) => node.to_owned(),
+                        ProofStep::Subproof(proof) => proof.conclusion().clone(),
+                        ProofStep::Inference {
+                            antecedents: _,
+                            expression,
+                            rule_name: _,
+                        } => expression.to_owned(),
+                    })
+                    .collect_vec(),
+                consequent: Box::new(expression.to_owned()),
             }),
         }
     }
 }
 
 impl Inference {
-    fn harvest_variables(&self, rule: &Self) -> Result<Vec<(String, Node)>> {
-        let mut ret: Vec<_> = vec![];
+    fn harvest_variables(&self, rule: &Self) -> Result<HashMap<String, Expression>> {
+        let mut ret: HashMap<String, Expression> = HashMap::new();
 
-        for (oexpr, mexpr) in zip(self.antecedent.as_ref(), rule.antecedent.as_ref()) {
-            ret.append(&mut oexpr.harvest_variables(mexpr)?);
+        for (oexpr, mexpr) in zip(&self.antecedent, &rule.antecedent) {
+            ret = ret
+                .into_iter()
+                .merge(Expression::harvest_variables(&oexpr, &mexpr)?)
+                .collect();
         }
 
-        ret.append(
-            &mut self
-                .consequent
-                .harvest_variables(rule.consequent.as_ref())?,
-        );
+        ret = ret
+            .into_iter()
+            .merge(self.consequent.harvest_variables(&rule.consequent)?)
+            .collect();
         // ret.sort();
         // ret.dedup();
         Ok(ret)
@@ -74,12 +71,11 @@ impl Inference {
         // Complexity sort of explodes with all the Vec.sorts()...
 
         let mappings = self.harvest_variables(&rule.rule)?;
-        if rule.rule.consequent.alpha_replace_all(&mappings) != *self.consequent {
-            eprintln!(
-                "{} != {}",
-                &rule.rule.consequent.alpha_replace_all(&mappings),
-                self.consequent
-            );
+
+        let alpha_replaced_consquent = rule.rule.consequent.clone().alpha_replace_all(&mappings);
+
+        if alpha_replaced_consquent != *self.consequent {
+            eprintln!("{} != {}", alpha_replaced_consquent, self.consequent);
             bail!(
                 "{} does not follow from {:?} using {}",
                 self.consequent,
@@ -92,7 +88,7 @@ impl Inference {
             .antecedent
             .iter()
             .zip(rule.rule.antecedent.iter())
-            .all(|(oa, ma)| *oa == ma.alpha_replace_all(&mappings))
+            .all(|(oa, ma)| *oa == ma.clone().alpha_replace_all(&mappings))
         {
             bail!(
                 "{:?} does not follow from {:?} using {}",
@@ -117,15 +113,15 @@ mod tests {
     fn basic_inference() {
         let rule = InferenceRule {
             rule: Inference {
-                antecedent: Rc::new(vec![ast::parser::parse_expression("A ^ B").unwrap()]),
-                consequent: Rc::new(ast::parser::parse_expression("B ^ A").unwrap()),
+                antecedent: vec![ast::parser::parse_expression("A ^ B").unwrap()],
+                consequent: Box::new(ast::parser::parse_expression("B ^ A").unwrap()),
             },
             name: { "Example".into() },
         };
 
         let test_expr = Inference {
-            antecedent: Rc::new(vec![ast::parser::parse_expression("X ^ Y").unwrap()]),
-            consequent: Rc::new(ast::parser::parse_expression("Y ^ X").unwrap()),
+            antecedent: vec![ast::parser::parse_expression("X ^ Y").unwrap()],
+            consequent: Box::new(ast::parser::parse_expression("Y ^ X").unwrap()),
         };
 
         test_expr.validate(&rule).unwrap()
