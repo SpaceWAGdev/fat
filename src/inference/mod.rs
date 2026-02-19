@@ -1,6 +1,6 @@
 use crate::{
     ast::Node,
-    proof::{self, ProofStep},
+    proof::ProofStep,
 };
 use anyhow::{Result, bail};
 use itertools::Itertools;

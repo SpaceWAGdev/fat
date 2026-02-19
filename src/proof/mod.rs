@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use crate::{
     ast::{self, Node},
-    inference::{self, Inference, InferenceRule},
+    inference::{Inference, InferenceRule},
 };
 use anyhow::{Result, bail, ensure};
 use itertools::Itertools;
@@ -22,9 +22,9 @@ impl Proof {
             ProofStep::Axiom(node) => node.to_owned(),
             ProofStep::Subproof(proof) => proof.get_concluding_expr(),
             ProofStep::Inference {
-                antecedents,
+                antecedents: _,
                 expression,
-                rule_name,
+                rule_name: _,
             } => expression.to_owned(),
         }
     }
@@ -109,9 +109,9 @@ fn parse_proofline(line: &str, number: usize) -> Result<ProofLine<'_>> {
     Ok(ProofLine {
         expression: expr,
         references: refs,
-        assumption_removals: assumption_removals,
+        assumption_removals,
         rulename: segments[0].trim(),
-        number: number,
+        number,
     })
 }
 

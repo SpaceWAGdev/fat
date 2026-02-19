@@ -59,7 +59,7 @@ impl Node {
     pub fn new_binary(expr_type: ExprType, lhs: Node, rhs: Node) -> Result<Self> {
         ensure!(expr_type.binary());
         Ok(Self {
-            expr_type: expr_type,
+            expr_type,
             arguments: Arguments::Binary(Rc::new(lhs), Rc::new(rhs)),
         })
     }
