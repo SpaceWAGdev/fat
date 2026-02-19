@@ -48,7 +48,7 @@ impl ProofStep {
             ProofStep::Subproof(proof) => proof.validate(rules),
             ProofStep::Inference {
                 antecedents,
-                expression,
+                expression: _,
                 rule_name,
             } => {
                 let ir = rules
@@ -57,21 +57,15 @@ impl ProofStep {
 
                 let inference = Inference::try_from(self)?;
 
-                let self_valid = match ir {
-                    Some(rule) => {
-                        if let Err(e) = inference.validate(rule) {
-                            return Err(e);
-                        }
-                    }
+                match ir {
+                    Some(rule) => inference.validate(rule)?,
                     None => bail!(
                         "Rule {rule_name} is not defined. It may be excluded from your proof."
                     ),
                 };
 
                 for antecedent in antecedents {
-                    if let Err(e) = antecedent.as_ref().validate(rules) {
-                        return Err(e);
-                    }
+                    antecedent.as_ref().validate(rules)?
                 }
 
                 Ok(())
@@ -98,29 +92,27 @@ fn parse_numeric_references(line: &str) -> (Vec<usize>, Vec<usize>) {
             if let Ok(num) = cleaned.parse() {
                 assumption_removals.push(num)
             }
-        } else {
-            if let Ok(num) = segment.trim().parse() {
-                refs.push(num)
-            }
+        } else if let Ok(num) = segment.trim().parse() {
+            refs.push(num)
         }
     }
 
-    return (refs, assumption_removals);
+    (refs, assumption_removals)
 }
 
-fn parse_proofline(line: &str, number: usize) -> Result<ProofLine> {
+fn parse_proofline(line: &str, number: usize) -> Result<ProofLine<'_>> {
     let segments: Vec<&str> = line.split("|").collect();
     ensure!(segments.len() == 3, "Proof line {number} is ill-formed.");
 
     let (refs, assumption_removals) = parse_numeric_references(segments[2]);
     let expr = format!("({})", segments[1].trim());
-    return Ok(ProofLine {
+    Ok(ProofLine {
         expression: expr,
         references: refs,
         assumption_removals: assumption_removals,
         rulename: segments[0].trim(),
         number: number,
-    });
+    })
 }
 
 fn parse_proof_step(line: ProofLine, proof: &String) -> Result<ProofStep> {
@@ -141,7 +133,7 @@ fn parse_proof_step(line: ProofLine, proof: &String) -> Result<ProofStep> {
                 if proofline.number == line.number {
                     bail!("Line {} depends on itself.", line.number)
                 }
-                let step = parse_proof_step(proofline, &proof)?;
+                let step = parse_proof_step(proofline, proof)?;
                 ante.push(Rc::new(step));
             }
 

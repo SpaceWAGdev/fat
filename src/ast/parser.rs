@@ -6,39 +6,36 @@ use itertools::{Itertools, MultiPeek};
 
 #[derive(Debug)]
 enum Token {
-    LPAREN,
-    RPAREN,
-    VAR(String),
-    NOT,
-    AND,
-    OR,
-    XOR,
-    IMPL,
-    EQUIV,
-    TOP,
-    BOTTOM,
+    LParen,
+    RParen,
+    Var(String),
+    Not,
+    And,
+    Or,
+    Xor,
+    Impl,
+    Equiv,
+    Top,
+    Bottom,
 }
 
 impl Token {
     const fn is_binary_operation(&self) -> bool {
         use Token::*;
-        match self {
-            AND | OR | XOR | IMPL | EQUIV => return true,
-            _ => return false,
-        }
+        matches!(self, And | Or | Xor | Impl | Equiv)
     }
 }
 
 fn take_until_expr_closed(token_stream: &mut MultiPeek<IntoIter<Token>>) -> Result<Vec<Token>> {
     let mut counter = 0;
     let mut result: Vec<Token> = vec![];
-    while let Some(token) = token_stream.next() {
+    for token in token_stream.by_ref() {
         match token {
-            Token::LPAREN => {
+            Token::LParen => {
                 counter += 1;
                 result.push(token);
             }
-            Token::RPAREN => {
+            Token::RParen => {
                 counter -= 1;
                 result.push(token);
             }
@@ -57,67 +54,67 @@ fn take_until_expr_closed(token_stream: &mut MultiPeek<IntoIter<Token>>) -> Resu
 fn tokenize(expr: &str) -> Result<MultiPeek<IntoIter<Token>>> {
     let mut ret: Vec<Token> = vec![];
     let mut chars = expr.chars();
-    while let Some(char) = chars.next() {
+    for char in chars {
         match char {
-            '(' => ret.push(Token::LPAREN),
-            ')' => ret.push(Token::RPAREN),
-            'v' => ret.push(Token::OR),
-            '^' => ret.push(Token::AND),
-            '+' => ret.push(Token::XOR),
-            '>' => ret.push(Token::IMPL),
-            '!' => ret.push(Token::NOT),
-            '=' => ret.push(Token::EQUIV),
-            '0' => ret.push(Token::BOTTOM),
-            '1' => ret.push(Token::TOP),
+            '(' => ret.push(Token::LParen),
+            ')' => ret.push(Token::RParen),
+            'v' => ret.push(Token::Or),
+            '^' => ret.push(Token::And),
+            '+' => ret.push(Token::Xor),
+            '>' => ret.push(Token::Impl),
+            '!' => ret.push(Token::Not),
+            '=' => ret.push(Token::Equiv),
+            '0' => ret.push(Token::Bottom),
+            '1' => ret.push(Token::Top),
             ' ' => continue,
-            'A'..'Z' => ret.push(Token::VAR(char.to_string())),
+            'A'..'Z' => ret.push(Token::Var(char.to_string())),
             _ => {
                 bail!("Unexpected token {}", char)
             }
         }
     }
 
-    return Ok(ret.into_iter().multipeek());
+    Ok(ret.into_iter().multipeek())
 }
 
 /// Expressions need to be bracketed
 fn expr(token_stream: &mut MultiPeek<IntoIter<Token>>) -> Result<Node> {
     if let Some(c) = token_stream.next() {
         match c {
-            Token::LPAREN => {
+            Token::LParen => {
                 let temp = take_until_expr_closed(token_stream)?;
-                if let Some(tk) = token_stream.next() {
-                    if tk.is_binary_operation() {
-                        let lhs = expr(&mut temp.into_iter().multipeek())?;
-                        let rhs = expr(token_stream)?;
-                        match tk {
-                            Token::AND => {
-                                return Node::new_binary(ast::ExprType::AND, lhs, rhs);
-                            }
-                            Token::OR => {
-                                return Node::new_binary(ast::ExprType::OR, lhs, rhs);
-                            }
-                            Token::XOR => {
-                                return Node::new_binary(ast::ExprType::XOR, lhs, rhs);
-                            }
-                            Token::IMPL => {
-                                return Node::new_binary(ast::ExprType::IMPL, lhs, rhs);
-                            }
-                            Token::EQUIV => {
-                                return Node::new_binary(ast::ExprType::EQUIV, lhs, rhs);
-                            }
-                            _ => {
-                                bail!("Expected binary operation")
-                            }
+                if let Some(tk) = token_stream.next()
+                    && tk.is_binary_operation()
+                {
+                    let lhs = expr(&mut temp.into_iter().multipeek())?;
+                    let rhs = expr(token_stream)?;
+                    match tk {
+                        Token::And => {
+                            return Node::new_binary(ast::ExprType::And, lhs, rhs);
+                        }
+                        Token::Or => {
+                            return Node::new_binary(ast::ExprType::Or, lhs, rhs);
+                        }
+                        Token::Xor => {
+                            return Node::new_binary(ast::ExprType::Xor, lhs, rhs);
+                        }
+                        Token::Impl => {
+                            return Node::new_binary(ast::ExprType::Impl, lhs, rhs);
+                        }
+                        Token::Equiv => {
+                            return Node::new_binary(ast::ExprType::Equiv, lhs, rhs);
+                        }
+                        _ => {
+                            bail!("Expected binary operation")
                         }
                     }
                 }
-                return Ok(expr(&mut temp.into_iter().multipeek())?);
+                return expr(&mut temp.into_iter().multipeek());
             }
 
-            Token::NOT => return Ok(Node::new_not(expr(token_stream)?)),
+            Token::Not => return Ok(Node::new_not(expr(token_stream)?)),
 
-            Token::VAR(name) => return Ok(Node::new_var(name.as_str())),
+            Token::Var(name) => return Ok(Node::new_var(name.as_str())),
 
             _ => {
                 bail!("Unexpected token")
@@ -128,7 +125,7 @@ fn expr(token_stream: &mut MultiPeek<IntoIter<Token>>) -> Result<Node> {
 }
 
 pub fn parse_expression(expression: &str) -> Result<Node> {
-    return expr(&mut tokenize(expression)?);
+    expr(&mut tokenize(expression)?)
 }
 
 #[cfg(test)]
@@ -144,13 +141,13 @@ mod tests {
     fn expr_parse() {
         assert_eq!(
             parse_expression("(A v B)").unwrap(),
-            Node::new_binary(ast::ExprType::OR, Node::new_var("A"), Node::new_var("B")).unwrap()
+            Node::new_binary(ast::ExprType::Or, Node::new_var("A"), Node::new_var("B")).unwrap()
         );
         assert_eq!(
             parse_expression("((A v B) > C)").unwrap(),
             Node::new_binary(
-                ast::ExprType::IMPL,
-                Node::new_binary(ast::ExprType::OR, Node::new_var("A"), Node::new_var("B"))
+                ast::ExprType::Impl,
+                Node::new_binary(ast::ExprType::Or, Node::new_var("A"), Node::new_var("B"))
                     .unwrap(),
                 Node::new_var("C")
             )
@@ -159,8 +156,8 @@ mod tests {
         assert_eq!(
             parse_expression("((A v B) > C)").unwrap(),
             Node::new_binary(
-                ast::ExprType::IMPL,
-                Node::new_binary(ast::ExprType::OR, Node::new_var("A"), Node::new_var("B"))
+                ast::ExprType::Impl,
+                Node::new_binary(ast::ExprType::Or, Node::new_var("A"), Node::new_var("B"))
                     .unwrap(),
                 Node::new_var("C")
             )

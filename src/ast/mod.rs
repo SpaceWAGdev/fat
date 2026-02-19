@@ -4,29 +4,23 @@ pub mod parser;
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum ExprType {
-    VAR,
-    NOT,
-    AND,
-    OR,
-    IMPL,
-    XOR,
-    EQUIV,
+    Var,
+    Not,
+    And,
+    Or,
+    Impl,
+    Xor,
+    Equiv,
 }
 
 impl ExprType {
     pub const fn commutative(&self) -> bool {
         use ExprType::*;
-        match self {
-            AND | OR | XOR | EQUIV => true,
-            _ => false,
-        }
+        matches!(self, And | Or | Xor | Equiv)
     }
     pub const fn binary(&self) -> bool {
         use ExprType::*;
-        match self {
-            AND | OR | XOR | EQUIV | IMPL => true,
-            _ => false,
-        }
+        matches!(self, And | Or | Xor | Equiv | Impl)
     }
 }
 
@@ -45,36 +39,36 @@ pub struct Node {
 
 impl Node {
     pub fn new(expr_type: ExprType, arguments: Arguments) -> Node {
-        return Self {
-            expr_type: expr_type,
-            arguments: arguments,
-        };
+        Self {
+            expr_type,
+            arguments,
+        }
     }
 
     pub fn new_var(name: &str) -> Self {
-        return Self::new(ExprType::VAR, Arguments::Literal(name.to_owned()));
+        Self::new(ExprType::Var, Arguments::Literal(name.to_owned()))
     }
 
     pub fn new_not(argument: Node) -> Self {
-        return Self {
-            expr_type: ExprType::NOT,
+        Self {
+            expr_type: ExprType::Not,
             arguments: Arguments::Unary(Rc::new(argument)),
-        };
+        }
     }
 
     pub fn new_binary(expr_type: ExprType, lhs: Node, rhs: Node) -> Result<Self> {
         ensure!(expr_type.binary());
-        return Ok(Self {
+        Ok(Self {
             expr_type: expr_type,
             arguments: Arguments::Binary(Rc::new(lhs), Rc::new(rhs)),
-        });
+        })
     }
 
     fn get_leftmost_varname(&self) -> &str {
         match &self.arguments {
-            Arguments::Literal(c) => return c.as_str(),
-            Arguments::Unary(arg) => return arg.get_leftmost_varname(),
-            Arguments::Binary(lhs, _) => return lhs.get_leftmost_varname(),
+            Arguments::Literal(c) => c.as_str(),
+            Arguments::Unary(arg) => arg.get_leftmost_varname(),
+            Arguments::Binary(lhs, _) => lhs.get_leftmost_varname(),
         }
     }
 
@@ -83,17 +77,18 @@ impl Node {
             Arguments::Binary(lhs, rhs) => {
                 let ordered_lhs = lhs.order_lexicographically();
                 let ordered_rhs = rhs.order_lexicographically();
-                if self.expr_type.commutative() {
-                    if ordered_rhs.get_leftmost_varname() < ordered_lhs.get_leftmost_varname() {
-                        return Node::new_binary(self.expr_type.clone(), ordered_rhs, ordered_lhs)
-                            .expect("If A*B was good, B*A should also be good");
-                    }
-                };
-                return Node::new_binary(self.expr_type.clone(), ordered_lhs, ordered_rhs)
-                    .expect("If A*B was good, A*B should still be good");
+                if self.expr_type.commutative()
+                    && ordered_rhs.get_leftmost_varname() < ordered_lhs.get_leftmost_varname()
+                {
+                    return Node::new_binary(self.expr_type.clone(), ordered_rhs, ordered_lhs)
+                        .expect("If A*B was good, B*A should also be good");
+                }
+
+                Node::new_binary(self.expr_type.clone(), ordered_lhs, ordered_rhs)
+                    .expect("If A*B was good, A*B should still be good")
             }
-            Arguments::Unary(arg) => return arg.clone().order_lexicographically(),
-            Arguments::Literal(_) => return self.clone(),
+            Arguments::Unary(arg) => arg.clone().order_lexicographically(),
+            Arguments::Literal(_) => self.clone(),
         }
     }
 
@@ -107,13 +102,13 @@ impl Node {
         );
 
         match (&metaexpression.arguments, &self.arguments) {
-            (Arguments::Literal(c), _) => return Ok(vec![(c.clone(), self.clone())]),
-            (Arguments::Unary(arg), _) => return arg._impl_harvest_variables(metaexpression),
+            (Arguments::Literal(c), _) => Ok(vec![(c.clone(), self.clone())]),
+            (Arguments::Unary(arg), _) => arg._impl_harvest_variables(metaexpression),
             (Arguments::Binary(lhs, rhs), _) => {
                 let mut ret: Vec<(String, Self)> = vec![];
                 ret.append(&mut lhs._impl_harvest_variables(metaexpression)?);
                 ret.append(&mut rhs._impl_harvest_variables(metaexpression)?);
-                return Ok(ret);
+                Ok(ret)
             }
         }
     }
@@ -121,7 +116,7 @@ impl Node {
     pub fn harvest_variables(&self, metaexpression: &Self) -> Result<Vec<(String, Self)>> {
         let ordered_oexpression = self.order_lexicographically();
         let ordered_mexpression = metaexpression.order_lexicographically();
-        return ordered_oexpression._impl_harvest_variables(&ordered_mexpression);
+        ordered_oexpression._impl_harvest_variables(&ordered_mexpression)
     }
 
     pub fn alpha_replace_all(&self, replacements: &Vec<(String, Self)>) -> Self {
@@ -149,20 +144,20 @@ impl Node {
                 }
             }
         }
-        return self.clone();
+        self.clone()
     }
 }
 
 impl Display for Node {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let op = match self.expr_type {
-            ExprType::VAR => "",
-            ExprType::NOT => "¬",
-            ExprType::AND => "∧",
-            ExprType::OR => "∨",
-            ExprType::IMPL => "→",
-            ExprType::XOR => "⊕",
-            ExprType::EQUIV => "⇔",
+            ExprType::Var => "",
+            ExprType::Not => "¬",
+            ExprType::And => "∧",
+            ExprType::Or => "∨",
+            ExprType::Impl => "→",
+            ExprType::Xor => "⊕",
+            ExprType::Equiv => "⇔",
         };
 
         match &self.arguments {
@@ -180,7 +175,7 @@ impl PartialEq for Node {
         };
 
         use Arguments::*;
-        return match (&self.arguments, &other.arguments) {
+        match (&self.arguments, &other.arguments) {
             (Literal(lit1), Literal(lit2)) => lit1 == lit2,
             (Unary(arg1), Unary(arg2)) => arg1 == arg2,
             (Binary(lhs1, rhs1), Binary(lhs2, rhs2)) => {
@@ -192,7 +187,7 @@ impl PartialEq for Node {
                 }
             }
             _ => false, // self.arguments was != other.arguments if there is no cartesian product
-        };
+        }
     }
 }
 
@@ -204,30 +199,30 @@ mod tests {
 
     fn create_two_equivalent_statements() -> (Node, Node) {
         let a = Rc::new(Node {
-            expr_type: ExprType::VAR,
+            expr_type: ExprType::Var,
             arguments: Arguments::Literal("A".to_string()),
         });
         let b = Rc::new(Node {
-            expr_type: ExprType::VAR,
+            expr_type: ExprType::Var,
             arguments: Arguments::Literal("B".to_string()),
         });
         let c = Rc::new(Node {
-            expr_type: ExprType::VAR,
+            expr_type: ExprType::Var,
             arguments: Arguments::Literal("C".to_string()),
         });
 
         let and = Rc::new(Node {
-            expr_type: ExprType::AND,
+            expr_type: ExprType::And,
             arguments: Arguments::Binary(a.clone(), b.clone()),
         });
 
         let or = Node {
-            expr_type: ExprType::OR,
+            expr_type: ExprType::Or,
             arguments: Arguments::Binary(and.clone(), c.clone()),
         };
 
         let or2 = Node {
-            expr_type: ExprType::OR,
+            expr_type: ExprType::Or,
             arguments: Arguments::Binary(c.clone(), and.clone()),
         };
 

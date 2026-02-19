@@ -17,31 +17,6 @@ pub struct InferenceRule {
     pub name: String,
 }
 
-/// Return type: Vec<Vec<(metavar, objvar)>>
-/// Meaning metavar.replace(mapping) gives the new objvar
-fn generate_variable_mapping_permutations(
-    metavars: &Vec<String>,
-    objvars: &Vec<String>,
-) -> Result<Vec<Vec<(String, String)>>> {
-    anyhow::ensure!(
-        metavars.len() == objvars.len(),
-        "The number of meta variables and object variables does not match."
-    );
-
-    let mut ret: Vec<Vec<(String, String)>> = Vec::new();
-
-    for (_, perm) in metavars.iter().permutations(metavars.len()).enumerate() {
-        ret.push(
-            perm.into_iter()
-                .enumerate()
-                .map(|(j, mvar)| (mvar.clone(), objvars[j].clone()))
-                .collect(),
-        )
-    }
-
-    return Ok(ret);
-}
-
 impl TryFrom<&ProofStep> for Inference {
     type Error = anyhow::Error;
 
@@ -54,7 +29,7 @@ impl TryFrom<&ProofStep> for Inference {
             ProofStep::Inference {
                 antecedents,
                 expression,
-                rule_name,
+                rule_name: _,
             } => Ok(Inference {
                 antecedent: Rc::new(
                     antecedents
@@ -63,9 +38,9 @@ impl TryFrom<&ProofStep> for Inference {
                             ProofStep::Axiom(node) => node.to_owned(),
                             ProofStep::Subproof(proof) => proof.get_concluding_expr(),
                             ProofStep::Inference {
-                                antecedents,
+                                antecedents: _,
                                 expression,
-                                rule_name,
+                                rule_name: _,
                             } => expression.to_owned(),
                         })
                         .collect_vec(),
@@ -87,7 +62,7 @@ impl Inference {
         ret.append(
             &mut self
                 .consequent
-                .harvest_variables(&rule.consequent.as_ref())?,
+                .harvest_variables(rule.consequent.as_ref())?,
         );
         // ret.sort();
         // ret.dedup();
@@ -99,9 +74,6 @@ impl Inference {
         // Complexity sort of explodes with all the Vec.sorts()...
 
         let mappings = self.harvest_variables(&rule.rule)?;
-
-        // self = objectvars; rule = metavars
-
         if rule.rule.consequent.alpha_replace_all(&mappings) != *self.consequent {
             eprintln!(
                 "{} != {}",
@@ -130,7 +102,7 @@ impl Inference {
             );
         }
 
-        return Ok(());
+        Ok(())
     }
 }
 
@@ -139,27 +111,7 @@ mod tests {
     use std::vec;
 
     use super::*;
-    use crate::ast::{self, *};
-
-    #[test]
-    fn variable_mappings() {
-        let m = vec!["A", "B"].iter().map(|s| s.to_string()).collect();
-        let o = vec!["x", "y"].iter().map(|s| s.to_string()).collect();
-
-        assert_eq!(
-            generate_variable_mapping_permutations(&m, &o).unwrap(),
-            vec![
-                vec![
-                    ("A".to_string(), "x".to_string()),
-                    ("B".to_string(), "y".to_string())
-                ],
-                vec![
-                    ("B".to_string(), "x".to_string()),
-                    ("A".to_string(), "y".to_string()),
-                ],
-            ]
-        )
-    }
+    use crate::ast;
 
     #[test]
     fn basic_inference() {
