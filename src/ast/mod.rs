@@ -1,5 +1,5 @@
 use anyhow::{Result, ensure};
-use std::{collections::HashMap, fmt::Display, rc::Rc};
+use std::{fmt::Display, rc::Rc, vec};
 pub mod parser;
 
 #[derive(PartialEq, Debug, Clone)]
@@ -70,28 +70,61 @@ impl Node {
         });
     }
 
-    fn _impl_harvest_variables(&self) -> Vec<String> {
-        let mut v: Vec<String> = Vec::new();
-
+    fn get_leftmost_varname(&self) -> &str {
         match &self.arguments {
-            Arguments::Binary(node, node1) => {
-                v.extend(node.harvest_variables());
-                v.extend(node1.harvest_variables());
+            Arguments::Literal(c) => return c.as_str(),
+            Arguments::Unary(arg) => return arg.get_leftmost_varname(),
+            Arguments::Binary(lhs, _) => return lhs.get_leftmost_varname(),
+        }
+    }
+
+    fn order_lexicographically(&self) -> Self {
+        match &self.arguments {
+            Arguments::Binary(lhs, rhs) => {
+                let ordered_lhs = lhs.order_lexicographically();
+                let ordered_rhs = rhs.order_lexicographically();
+                if self.expr_type.commutative() {
+                    if ordered_rhs.get_leftmost_varname() < ordered_lhs.get_leftmost_varname() {
+                        return Node::new_binary(self.expr_type.clone(), ordered_rhs, ordered_lhs)
+                            .expect("If A*B was good, B*A should also be good");
+                    }
+                };
+                return Node::new_binary(self.expr_type.clone(), ordered_lhs, ordered_rhs)
+                    .expect("If A*B was good, A*B should still be good");
             }
-            Arguments::Unary(node) => v.extend(node.harvest_variables()),
-            Arguments::Literal(arg) => v.push(arg.clone()),
-        };
-        return v;
+            Arguments::Unary(arg) => return arg.clone().order_lexicographically(),
+            Arguments::Literal(_) => return self.clone(),
+        }
     }
 
-    pub fn harvest_variables(&self) -> Vec<String> {
-        let mut v = self._impl_harvest_variables();
-        v.sort();
-        v.dedup();
-        return v;
+    /// This only works if self and metavars are lexicographically ordered
+    fn _impl_harvest_variables(&self, metaexpression: &Self) -> Result<Vec<(String, Self)>> {
+        ensure!(
+            self.expr_type == metaexpression.expr_type,
+            "Cannot transform {:?} into {:?}",
+            metaexpression,
+            self
+        );
+
+        match (&metaexpression.arguments, &self.arguments) {
+            (Arguments::Literal(c), _) => return Ok(vec![(c.clone(), self.clone())]),
+            (Arguments::Unary(arg), _) => return arg._impl_harvest_variables(metaexpression),
+            (Arguments::Binary(lhs, rhs), _) => {
+                let mut ret: Vec<(String, Self)> = vec![];
+                ret.append(&mut lhs._impl_harvest_variables(metaexpression)?);
+                ret.append(&mut rhs._impl_harvest_variables(metaexpression)?);
+                return Ok(ret);
+            }
+        }
     }
 
-    pub fn alpha_replace_all(&self, replacements: &Vec<(String, String)>) -> Self {
+    pub fn harvest_variables(&self, metaexpression: &Self) -> Result<Vec<(String, Self)>> {
+        let ordered_oexpression = self.order_lexicographically();
+        let ordered_mexpression = metaexpression.order_lexicographically();
+        return ordered_oexpression._impl_harvest_variables(&ordered_mexpression);
+    }
+
+    pub fn alpha_replace_all(&self, replacements: &Vec<(String, Self)>) -> Self {
         match self.arguments {
             Arguments::Binary(ref node, ref node1) => {
                 return Node {
@@ -109,18 +142,14 @@ impl Node {
                 };
             }
             Arguments::Literal(ref lit) => {
-                let mut new_lit_val = lit.clone();
-
-                for (f, t) in replacements {
-                    new_lit_val = new_lit_val.replace(f, t);
+                for (name, replacement) in replacements {
+                    if lit == name {
+                        return replacement.clone();
+                    }
                 }
-
-                return Node {
-                    expr_type: self.expr_type.clone(),
-                    arguments: Arguments::Literal(new_lit_val),
-                };
             }
         }
+        return self.clone();
     }
 }
 
@@ -215,7 +244,7 @@ mod tests {
     #[test]
     fn alpha_replacement() {
         let (s1, s2) = create_two_equivalent_statements();
-        let s2a = s2.alpha_replace_all(&vec![("A".to_string(), "X".to_string())]);
+        let s2a = s2.alpha_replace_all(&vec![("A".to_string(), Node::new_var("X"))]);
         assert_ne!(s2, s2a);
         assert_ne!(s1, s2a);
         assert_eq!(s1, s2);

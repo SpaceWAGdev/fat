@@ -1,13 +1,14 @@
 use crate::ast::Node;
 use anyhow::{Result, bail};
 use itertools::Itertools;
-use std::rc::Rc;
+use std::{iter::zip, rc::Rc};
 
+#[derive(Debug)]
 pub struct Inference {
     pub antecedent: Rc<Vec<Node>>,
     pub consequent: Rc<Node>,
 }
-
+#[derive(Debug)]
 pub struct InferenceRule {
     rule: Inference,
     name: String,
@@ -39,64 +40,71 @@ fn generate_variable_mapping_permutations(
 }
 
 impl Inference {
-    fn harvest_variables(&self) -> Vec<String> {
+    fn harvest_variables(&self, rule: &Self) -> Result<Vec<(String, Node)>> {
         let mut ret: Vec<_> = vec![];
 
-        for expr in self.antecedent.as_ref() {
-            ret.append(&mut expr.harvest_variables());
+        for (oexpr, mexpr) in zip(self.antecedent.as_ref(), rule.antecedent.as_ref()) {
+            ret.append(&mut oexpr.harvest_variables(mexpr)?);
         }
 
-        ret.append(&mut self.consequent.harvest_variables());
-        ret.sort();
-        ret.dedup();
-        ret
+        ret.append(
+            &mut self
+                .consequent
+                .harvest_variables(&rule.consequent.as_ref())?,
+        );
+        // ret.sort();
+        // ret.dedup();
+        Ok(ret)
     }
 
     pub fn validate(&self, rule: &Self) -> Result<()> {
         // TODO: Maybe convert the variables to an easily-comparable type (i.e. not String) for checking inferences?
         // Complexity sort of explodes with all the Vec.sorts()...
 
-        let metavars = rule.harvest_variables();
-        let objvars = self.harvest_variables();
-        let permutations = generate_variable_mapping_permutations(&metavars, &objvars)?;
+        let mappings = self.harvest_variables(rule)?;
 
         // self = objectvars; rule = metavars
-        for mapping in permutations {
-            if rule.consequent.alpha_replace_all(&mapping) != *self.consequent {
-                eprintln!(
-                    "{} != {}",
-                    &rule.consequent.alpha_replace_all(&mapping),
-                    self.consequent
-                );
-                continue;
-            }
 
-            // TODO: Test all permutations for antecedents, so that the arguments don't necessarily have to follow in order
-            // Or: Order everything lexicographically
-            if !self
-                .antecedent
-                .iter()
-                .zip(rule.antecedent.iter())
-                .all(|(oa, ma)| *oa == ma.alpha_replace_all(&mapping))
-            {
-                continue;
-            }
-
-            return Ok(());
+        if rule.consequent.alpha_replace_all(&mappings) != *self.consequent {
+            eprintln!(
+                "{} != {}",
+                &rule.consequent.alpha_replace_all(&mappings),
+                self.consequent
+            );
+            bail!(
+                "{:?} does not follow from {:?} using {:?} |- {:?}",
+                self.consequent,
+                self.antecedent,
+                rule.antecedent,
+                rule.consequent
+            );
         }
 
-        bail!(
-            "{} does not follow from {:?}",
-            self.consequent,
-            self.antecedent
-        );
+        if !self
+            .antecedent
+            .iter()
+            .zip(rule.antecedent.iter())
+            .all(|(oa, ma)| *oa == ma.alpha_replace_all(&mappings))
+        {
+            bail!(
+                "{:?} does not follow from {:?} using {:?} |- {:?}",
+                self.consequent,
+                self.antecedent,
+                rule.antecedent,
+                rule.consequent
+            );
+        }
+
+        return Ok(());
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::vec;
+
     use super::*;
-    use crate::ast::*;
+    use crate::ast::{self, *};
 
     #[test]
     fn variable_mappings() {
@@ -119,62 +127,15 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
-    fn variable_mappings_mismatch_metavars() {
-        let o = vec!["x", "y"].iter().map(|s| s.to_string()).collect();
-        let l = vec!["x", "y", "z"].iter().map(|s| s.to_string()).collect();
-
-        generate_variable_mapping_permutations(&o, &l).unwrap();
-    }
-
-    #[test]
     fn basic_inference() {
-        let a = Rc::new(Node {
-            expr_type: ExprType::VAR,
-            arguments: Arguments::Literal("A".to_string()),
-        });
-        let b = Rc::new(Node {
-            expr_type: ExprType::VAR,
-            arguments: Arguments::Literal("B".to_string()),
-        });
-
-        let a_and_b = Node {
-            expr_type: ExprType::AND,
-            arguments: Arguments::Binary(a.clone(), b.clone()),
-        };
-
-        let b_and_a = Node {
-            expr_type: ExprType::AND,
-            arguments: Arguments::Binary(b.clone(), a.clone()),
-        };
-
-        let x = Rc::new(Node {
-            expr_type: ExprType::VAR,
-            arguments: Arguments::Literal("x".to_string()),
-        });
-        let y = Rc::new(Node {
-            expr_type: ExprType::VAR,
-            arguments: Arguments::Literal("y".to_string()),
-        });
-
-        let x_and_y = Node {
-            expr_type: ExprType::AND,
-            arguments: Arguments::Binary(x.clone(), y.clone()),
-        };
-
-        let y_and_x = Node {
-            expr_type: ExprType::AND,
-            arguments: Arguments::Binary(y.clone(), x.clone()),
-        };
-
         let rule = Inference {
-            antecedent: Rc::new(vec![a_and_b]),
-            consequent: Rc::new(b_and_a.clone()),
+            antecedent: Rc::new(vec![ast::parser::parse_expression("A ^ B").unwrap()]),
+            consequent: Rc::new(ast::parser::parse_expression("B ^ A").unwrap()),
         };
 
         let test_expr = Inference {
-            antecedent: Rc::new(vec![x_and_y]),
-            consequent: Rc::new(y_and_x.clone()),
+            antecedent: Rc::new(vec![ast::parser::parse_expression("X ^ Y").unwrap()]),
+            consequent: Rc::new(ast::parser::parse_expression("Y ^ X").unwrap()),
         };
 
         test_expr.validate(&rule).unwrap()
