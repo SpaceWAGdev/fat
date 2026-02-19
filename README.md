@@ -1,1 +1,1 @@
-# $$ F \forall \top $$
+$$ F \forall \top $$
