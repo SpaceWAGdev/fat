@@ -167,4 +167,8 @@ mod tests {
             .unwrap()
         );
     }
+    #[test]
+    fn redundant_parens() {
+        assert_eq!(parse_expression("((((A))))").unwrap(), Node::new_var("A"))
+    }
 }

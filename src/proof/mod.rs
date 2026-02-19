@@ -2,15 +2,35 @@ use std::rc::Rc;
 
 use crate::{
     ast::{self, Node},
-    inference::InferenceRule,
+    inference::{self, Inference, InferenceRule},
 };
-use anyhow::{Result, ensure};
+use anyhow::{Result, bail, ensure};
 use itertools::Itertools;
 
+#[derive(Debug)]
 pub struct Proof {
-    conclusion: ProofStep,
+    pub conclusion: ProofStep,
 }
 
+impl Proof {
+    pub fn validate(&self, rules: &Vec<InferenceRule>) -> Result<()> {
+        self.conclusion.validate(rules)
+    }
+
+    pub fn get_concluding_expr(&self) -> Node {
+        match &self.conclusion {
+            ProofStep::Axiom(node) => node.to_owned(),
+            ProofStep::Subproof(proof) => proof.get_concluding_expr(),
+            ProofStep::Inference {
+                antecedents,
+                expression,
+                rule_name,
+            } => expression.to_owned(),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub enum ProofStep {
     Axiom(Node),
     Subproof(Rc<Proof>),
@@ -21,41 +41,84 @@ pub enum ProofStep {
     },
 }
 
+impl ProofStep {
+    pub fn validate(&self, rules: &Vec<InferenceRule>) -> Result<()> {
+        match self {
+            ProofStep::Axiom(_) => Ok(()),
+            ProofStep::Subproof(proof) => proof.validate(rules),
+            ProofStep::Inference {
+                antecedents,
+                expression,
+                rule_name,
+            } => {
+                let ir = rules
+                    .iter()
+                    .find(|rule: &&InferenceRule| rule.name == rule_name.as_str());
+
+                let inference = Inference::try_from(self)?;
+
+                let self_valid = match ir {
+                    Some(rule) => {
+                        if let Err(e) = inference.validate(rule) {
+                            return Err(e);
+                        }
+                    }
+                    None => bail!(
+                        "Rule {rule_name} is not defined. It may be excluded from your proof."
+                    ),
+                };
+
+                for antecedent in antecedents {
+                    if let Err(e) = antecedent.as_ref().validate(rules) {
+                        return Err(e);
+                    }
+                }
+
+                Ok(())
+            }
+        }
+    }
+}
+
 struct ProofLine<'a> {
     rulename: &'a str,
-    expression: &'a str,
+    expression: String,
     references: Vec<usize>,
     assumption_removals: Vec<usize>,
     number: usize,
 }
 /// Return: (inference refs, assumption removals)
-fn parse_numeric_references(line: &str) -> Result<(Vec<usize>, Vec<usize>)> {
+fn parse_numeric_references(line: &str) -> (Vec<usize>, Vec<usize>) {
     let mut refs: Vec<usize> = Vec::new();
     let mut assumption_removals: Vec<usize> = Vec::new();
 
     for segment in line.split(",") {
         if segment.trim().starts_with("(") {
             let cleaned = segment.trim_matches(['(', ')']);
-            assumption_removals.push(segment.parse()?);
+            if let Ok(num) = cleaned.parse() {
+                assumption_removals.push(num)
+            }
         } else {
-            refs.push(segment.trim().parse()?);
+            if let Ok(num) = segment.trim().parse() {
+                refs.push(num)
+            }
         }
     }
 
-    return Ok((refs, assumption_removals));
+    return (refs, assumption_removals);
 }
 
 fn parse_proofline(line: &str, number: usize) -> Result<ProofLine> {
     let segments: Vec<&str> = line.split("|").collect();
-    ensure!(segments.len() == 3, "Inference line is ill-formed.");
+    ensure!(segments.len() == 3, "Proof line {number} is ill-formed.");
 
-    let (refs, assumption_removals) = parse_numeric_references(segments[2])?;
-
+    let (refs, assumption_removals) = parse_numeric_references(segments[2]);
+    let expr = format!("({})", segments[1].trim());
     return Ok(ProofLine {
-        expression: segments[1],
+        expression: expr,
         references: refs,
         assumption_removals: assumption_removals,
-        rulename: segments[0],
+        rulename: segments[0].trim(),
         number: number,
     });
 }
@@ -63,9 +126,9 @@ fn parse_proofline(line: &str, number: usize) -> Result<ProofLine> {
 fn parse_proof_step(line: ProofLine, proof: &String) -> Result<ProofStep> {
     match line.rulename {
         "Ax" => Ok(ProofStep::Axiom(ast::parser::parse_expression(
-            line.expression,
+            line.expression.as_str(),
         )?)),
-        "AnE" => Ok(ProofStep::Subproof(Rc::new(parse_proof(
+        "AnB" => Ok(ProofStep::Subproof(Rc::new(parse_proof(
             proof.to_owned(),
             Some(line.number),
         )?))),
@@ -75,13 +138,16 @@ fn parse_proof_step(line: ProofLine, proof: &String) -> Result<ProofStep> {
             for line_ref in line.references {
                 let proofline =
                     parse_proofline(proof.split("\n").collect_vec()[line_ref], line_ref)?;
+                if proofline.number == line.number {
+                    bail!("Line {} depends on itself.", line.number)
+                }
                 let step = parse_proof_step(proofline, &proof)?;
                 ante.push(Rc::new(step));
             }
 
             Ok(ProofStep::Inference {
                 antecedents: ante,
-                expression: ast::parser::parse_expression(line.expression)?,
+                expression: ast::parser::parse_expression(line.expression.as_str())?,
                 rule_name: line.rulename.to_owned(),
             })
         }
@@ -103,10 +169,42 @@ pub fn parse_proof(proof: String, starting_point: Option<usize>) -> Result<Proof
     }
 
     return Ok(Proof {
-        conclusion: parse_proof_step(parse_proofline(lines[conclusion], conclusion)?, &proof)?,
+        conclusion: parse_proof_step(
+            parse_proofline(lines[conclusion].trim_end_matches("QED"), conclusion)?,
+            &proof,
+        )?,
     });
 }
 
-pub fn validate_proof(proof: Proof, rules: Vec<InferenceRule>) -> Result<()> {
-    unimplemented!()
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn basic_parse() {
+        let raw = r#"Ax | A |
+Ax | B | 0 QED
+"#;
+        let proof = parse_proof(raw.to_string(), None).unwrap();
+        if let ProofStep::Axiom(_) = proof.conclusion {
+        } else {
+            panic!("{:?}", proof)
+        }
+    }
+
+    #[test]
+    fn validate() {
+        let raw = r#"Ax | A |
+        Example | B | 0 QED
+        "#;
+        let proof = parse_proof(raw.to_string(), None).unwrap();
+        let rules = vec![InferenceRule {
+            name: "Example".into(),
+            rule: Inference {
+                antecedent: Rc::new(vec![ast::parser::parse_expression("X").unwrap()]),
+                consequent: Rc::new(ast::parser::parse_expression("Y").unwrap()),
+            },
+        }];
+        proof.validate(&rules).unwrap();
+    }
 }
