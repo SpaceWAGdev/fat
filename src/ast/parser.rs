@@ -53,7 +53,7 @@ fn take_until_expr_closed(token_stream: &mut MultiPeek<IntoIter<Token>>) -> Resu
 
 fn tokenize(expr: &str) -> Result<MultiPeek<IntoIter<Token>>> {
     let mut ret: Vec<Token> = vec![];
-    let mut chars = expr.chars();
+    let chars = expr.chars();
     for char in chars {
         match char {
             '(' => ret.push(Token::LParen),
@@ -67,7 +67,7 @@ fn tokenize(expr: &str) -> Result<MultiPeek<IntoIter<Token>>> {
             '0' => ret.push(Token::Bottom),
             '1' => ret.push(Token::Top),
             ' ' => continue,
-            'A'..'Z' => ret.push(Token::Var(char.to_string())),
+            'A'..='Z' => ret.push(Token::Var(char.to_string())),
             _ => {
                 bail!("Unexpected token {}", char)
             }
