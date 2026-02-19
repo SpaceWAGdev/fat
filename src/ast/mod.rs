@@ -161,8 +161,8 @@ impl Display for Node {
         };
 
         match &self.arguments {
-            Arguments::Binary(lhs, rhs) => write!(f, "({lhs}) {op} ({rhs})"),
-            Arguments::Unary(arg) => write!(f, "{op}({arg}"),
+            Arguments::Binary(lhs, rhs) => write!(f, "({lhs} {op} {rhs})"),
+            Arguments::Unary(arg) => write!(f, "({op}{arg})"),
             Arguments::Literal(value) => write!(f, "{value}"),
         }
     }

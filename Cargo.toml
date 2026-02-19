@@ -1,5 +1,5 @@
 [package]
-name = "proplog"
+name = "fat"
 version = "0.1.0"
 edition = "2024"
 

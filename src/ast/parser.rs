@@ -168,4 +168,11 @@ mod tests {
     fn redundant_parens() {
         assert_eq!(parse_expression("((((A))))").unwrap(), Node::new_var("A"))
     }
+    #[test]
+    fn all_symbols_nothrow() {
+        println!(
+            "{}",
+            parse_expression("((((AvB)^(C))>(D))=!!(A+B)))").unwrap()
+        );
+    }
 }
