@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 use crate::{
-    ast::{self, Node},
+    ast::{self, Expression},
     inference::{Inference, InferenceRule},
 };
 use anyhow::{Result, bail, ensure};
@@ -17,26 +17,30 @@ impl Proof {
         self.conclusion.validate(rules)
     }
 
-    pub fn get_concluding_expr(&self) -> Node {
+    pub fn conclusion(&self) -> &Expression {
         match &self.conclusion {
-            ProofStep::Axiom(node) => node.to_owned(),
-            ProofStep::Subproof(proof) => proof.get_concluding_expr(),
+            ProofStep::Axiom(node) => node,
+            ProofStep::Subproof(proof) => proof.conclusion(),
             ProofStep::Inference {
                 antecedents: _,
                 expression,
                 rule_name: _,
-            } => expression.to_owned(),
+            } => expression,
         }
+    }
+
+    pub fn premises(&self) -> Vec<&Expression> {
+        unimplemented!()
     }
 }
 
 #[derive(Debug)]
 pub enum ProofStep {
-    Axiom(Node),
-    Subproof(Rc<Proof>),
+    Axiom(Expression),
+    Subproof(Box<Proof>),
     Inference {
-        antecedents: Vec<Rc<ProofStep>>,
-        expression: Node,
+        antecedents: Vec<Box<ProofStep>>,
+        expression: Expression,
         rule_name: String,
     },
 }
@@ -120,12 +124,12 @@ fn parse_proof_step(line: ProofLine, proof: &String) -> Result<ProofStep> {
         "Ax" => Ok(ProofStep::Axiom(ast::parser::parse_expression(
             line.expression.as_str(),
         )?)),
-        "AnB" => Ok(ProofStep::Subproof(Rc::new(parse_proof(
+        "AnB" => Ok(ProofStep::Subproof(Box::new(parse_proof(
             proof.to_owned(),
             Some(line.number),
         )?))),
         _ => {
-            let mut ante: Vec<Rc<ProofStep>> = Vec::new();
+            let mut ante: Vec<Box<ProofStep>> = Vec::new();
 
             for line_ref in line.references {
                 let proofline =
@@ -134,7 +138,7 @@ fn parse_proof_step(line: ProofLine, proof: &String) -> Result<ProofStep> {
                     bail!("Line {} depends on itself.", line.number)
                 }
                 let step = parse_proof_step(proofline, proof)?;
-                ante.push(Rc::new(step));
+                ante.push(Box::new(step));
             }
 
             Ok(ProofStep::Inference {
@@ -193,8 +197,8 @@ Ax | B | 0 QED
         let rules = vec![InferenceRule {
             name: "Example".into(),
             rule: Inference {
-                antecedent: Rc::new(vec![ast::parser::parse_expression("X").unwrap()]),
-                consequent: Rc::new(ast::parser::parse_expression("Y").unwrap()),
+                antecedent: vec![ast::parser::parse_expression("X").unwrap()],
+                consequent: Box::new(ast::parser::parse_expression("Y").unwrap()),
             },
         }];
         proof.validate(&rules).unwrap();

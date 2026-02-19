@@ -1,0 +1,20 @@
+variable = @{ UPPERCASE_LETTER }
+literal = @{ "⊤" | "⊥"  }
+
+negation    =  { "!" }
+primary = _{ variable | literal | "(" ~ prop ~ ")" }
+atom        = _{ negation? ~ primary }
+
+bin_op = _{ and | or | implies | xor | equiv }
+and    =  { "^" }
+or     =  { "v" }
+implies   =  { "->" }
+xor    =  { ">-<" }
+equiv  =  { "<->" }
+
+prop = { atom ~ (bin_op ~ atom)* }
+
+// We can't have SOI and EOI on prop directly, because it is used recursively (e.g. with parentheses)
+expr = _{ SOI ~ prop ~ EOI }
+
+WHITESPACE = _{ " " }
