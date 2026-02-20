@@ -55,7 +55,7 @@ impl Inference {
         for (oexpr, mexpr) in zip(&self.antecedent, &rule.antecedent) {
             ret = ret
                 .into_iter()
-                .merge(Expression::harvest_variables(&oexpr, &mexpr)?)
+                .merge(Expression::harvest_variables(oexpr, mexpr)?)
                 .collect();
         }
 

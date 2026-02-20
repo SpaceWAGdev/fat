@@ -1,2 +1,5 @@
-/target
 .zed
+target
+pkg
+*.fat
+*.fatrules

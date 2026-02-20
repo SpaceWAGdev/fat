@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use crate::{
     ast::{self, Expression},
     inference::{Inference, InferenceRule},
@@ -121,11 +119,12 @@ fn parse_proofline(line: &str, number: usize) -> Result<ProofLine<'_>> {
 
 fn parse_proof_step(line: ProofLine, proof: &String) -> Result<ProofStep> {
     match line.rulename {
-        "Ax" => Ok(ProofStep::Axiom(ast::parser::parse_expression(
+        // assumption introductions are treated as axioms for now
+        "Ax" | "An" => Ok(ProofStep::Axiom(ast::parser::parse_expression(
             line.expression.as_str(),
         )?)),
         "AnB" => Ok(ProofStep::Subproof(Box::new(parse_proof(
-            proof.to_owned(),
+            proof.clone(),
             Some(line.number),
         )?))),
         _ => {

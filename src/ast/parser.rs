@@ -1,5 +1,5 @@
 use anyhow::{Result, bail};
-use comemo::{Tracked, memoize, track};
+use comemo::memoize;
 use pest::Parser;
 use pest::iterators::Pairs;
 use pest::pratt_parser::PrattParser;
@@ -28,9 +28,9 @@ pub struct ParsingError {
 
 impl From<anyhow::Error> for ParsingError {
     fn from(value: anyhow::Error) -> Self {
-        return ParsingError {
+        ParsingError {
             message: value.to_string(),
-        };
+        }
     }
 }
 
@@ -93,6 +93,11 @@ fn wrap_parse_expression(expr: &str) -> anyhow::Result<Expression> {
 
 #[memoize]
 pub fn parse_expression(expr: &str) -> Result<Expression, ParsingError> {
+    if expr.trim_ascii().is_empty() {
+        return Err(ParsingError {
+            message: "An empty string is not an expression".to_string(),
+        });
+    };
     wrap_parse_expression(expr).map_err(|e| ParsingError {
         message: e.to_string(),
     })

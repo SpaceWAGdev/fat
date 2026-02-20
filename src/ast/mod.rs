@@ -117,8 +117,8 @@ impl Expression {
                 Expression::Negation(Box::new(argument.alpha_replace_all(replacements)))
             }
             Expression::BinaryRelation { lhs, relation, rhs } => Expression::BinaryRelation {
-                relation: relation,
                 lhs: Box::new(lhs.alpha_replace_all(replacements)),
+                relation,
                 rhs: Box::new(rhs.alpha_replace_all(replacements)),
             },
         }
