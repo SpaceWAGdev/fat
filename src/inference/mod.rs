@@ -1,8 +1,8 @@
-use crate::{ast::Expression, proof::ProofStep};
+use crate::{AsLaTeX, ast::Expression, proof::ProofStep};
 use anyhow::{Result, bail};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, iter::zip};
+use std::{collections::HashMap, fmt::format, iter::zip};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct Inference {
@@ -104,6 +104,61 @@ impl Inference {
     }
 }
 
+impl AsLaTeX for InferenceRule {
+    fn as_latex(&self) -> anyhow::Result<String> {
+        let rule_latex = self.rule.as_latex()?;
+        let mut lines = rule_latex.split("\n").collect_vec();
+        let name = format!("\\RL{{ {} }}", self.name);
+        lines.insert(lines.len() - 2, name.as_str());
+        Ok(lines.join("\n"))
+    }
+}
+
+impl AsLaTeX for Inference {
+    fn as_latex(&self) -> anyhow::Result<String> {
+        Ok(match self.antecedent.len() {
+            0 => format!("\\AXC{{ {} }}\n", self.consequent.as_latex()?), // zero-argument inferences are assumed as axioms in tree display, even though they aren't when validating
+            1 => format!(
+                "{}\n\\UIC{{ {} }}\n",
+                self.antecedent[0].as_latex()?,
+                self.consequent.as_latex()?
+            ),
+            2 => format!(
+                "{}\n{}\n\\BIC{{ {} }}\n",
+                self.antecedent[0].as_latex()?,
+                self.antecedent[1].as_latex()?,
+                self.consequent.as_latex()?
+            ),
+            3 => format!(
+                "{}\n{}\n{}\n\\BIC{{ {} }}\n",
+                self.antecedent[0].as_latex()?,
+                self.antecedent[1].as_latex()?,
+                self.antecedent[2].as_latex()?,
+                self.consequent.as_latex()?
+            ),
+            4 => format!(
+                "{}\n{}\n{}\n{}\n\\QuaternaryInfC{{ {} }}\n",
+                self.antecedent[0].as_latex()?,
+                self.antecedent[1].as_latex()?,
+                self.antecedent[2].as_latex()?,
+                self.antecedent[3].as_latex()?,
+                self.consequent.as_latex()?
+            ),
+            5 => format!(
+                "{}\n{}\n{}\n{}\n{}\n\\QuinaryInfC{{ {} }}\n",
+                self.antecedent[0].as_latex()?,
+                self.antecedent[1].as_latex()?,
+                self.antecedent[2].as_latex()?,
+                self.antecedent[3].as_latex()?,
+                self.antecedent[4].as_latex()?,
+                self.consequent.as_latex()?
+            ),
+            _ => bail!("Cannot render an inference with > 5 antecedents as a tree."),
+        }
+        .to_string())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::vec;
@@ -162,6 +217,23 @@ bla: Blub
         println!(
             "{:#?}",
             serde_yaml::from_str::<InferenceRule>(rule).unwrap()
+        );
+    }
+    #[test]
+    fn latex_render() {
+        let rule = r#"
+    rule:
+        antecedent:
+            - (( A ∧ B ))
+        consequent: (( B ∧ A ))
+    name: Example
+    "#;
+        println!(
+            "{}",
+            serde_yaml::from_str::<InferenceRule>(rule)
+                .unwrap()
+                .as_latex()
+                .unwrap()
         );
     }
 }

@@ -5,7 +5,7 @@ use std::{collections::HashMap, fmt::Display};
 
 use anyhow::{Result, bail};
 
-use crate::ast::parser::parse_expression;
+use crate::{AsLaTeX, ast::parser::parse_expression};
 
 #[derive(Debug, Clone, Hash, PartialOrd)]
 pub enum Expression {
@@ -41,6 +41,19 @@ impl Display for BinaryRelation {
                 BinaryRelation::Xor => "⊕",
             }
         )
+    }
+}
+
+impl AsLaTeX for BinaryRelation {
+    fn as_latex(&self) -> Result<String> {
+        Ok(match self {
+            BinaryRelation::And => "\\wedge",
+            BinaryRelation::Or => "\\vee",
+            BinaryRelation::Impl => "\\to",
+            BinaryRelation::Equiv => "\\leftrightarrow",
+            BinaryRelation::Xor => "\\nleftrightarrow",
+        }
+        .into())
     }
 }
 
@@ -226,11 +239,29 @@ impl Display for Expression {
     }
 }
 
+impl AsLaTeX for Expression {
+    fn as_latex(&self) -> Result<String> {
+        Ok(match self {
+            Expression::Variable(v) => v.to_string(),
+            Expression::Literal(_) => todo!(),
+            Expression::Negation(expression) => format!("\\neg {}", expression.as_latex()?),
+            Expression::BinaryRelation { lhs, relation, rhs } => {
+                format!(
+                    "{} {} {}",
+                    lhs.as_latex()?,
+                    relation.as_latex()?,
+                    rhs.as_latex()?
+                )
+            }
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
 
-    use crate::ast::{Expression, parser::parse_expression, tests};
+    use crate::ast::{Expression, parser::parse_expression};
 
     #[test]
     fn commutative_equality() {

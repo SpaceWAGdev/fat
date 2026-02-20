@@ -1,4 +1,7 @@
+use std::fmt::format;
+
 use crate::{
+    AsLaTeX,
     ast::{self, Expression},
     inference::{Inference, InferenceRule},
 };
@@ -172,6 +175,15 @@ pub fn parse_proof(proof: String, starting_point: Option<usize>) -> Result<Proof
             &proof,
         )?,
     });
+}
+
+impl AsLaTeX for Proof {
+    fn as_latex(&self) -> anyhow::Result<String> {
+        Ok(format!(
+            "\\begin{{prooftree}}\n {} \\end{{prooftree}}",
+            self.conclusion().as_latex()?,
+        ))
+    }
 }
 
 #[cfg(test)]
