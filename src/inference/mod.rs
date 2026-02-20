@@ -1,14 +1,16 @@
 use crate::{ast::Expression, proof::ProofStep};
 use anyhow::{Result, bail};
 use itertools::Itertools;
-use std::{collections::HashMap, iter::zip, rc::Rc};
+use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, iter::zip};
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct Inference {
     pub antecedent: Vec<Expression>,
     pub consequent: Box<Expression>,
 }
-#[derive(Debug)]
+
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct InferenceRule {
     pub rule: Inference,
     pub name: String,
@@ -125,5 +127,39 @@ mod tests {
         };
 
         test_expr.validate(&rule).unwrap()
+    }
+
+    #[test]
+    fn serde_rules() {
+        let rule = InferenceRule {
+            rule: Inference {
+                antecedent: vec![ast::parser::parse_expression("A ^ B").unwrap()],
+                consequent: Box::new(ast::parser::parse_expression("B ^ A").unwrap()),
+            },
+            name: { "Example".into() },
+        };
+
+        let serialized = serde_yaml::to_string(&rule).unwrap();
+        println!("{serialized}");
+        assert_eq!(
+            serde_yaml::from_str::<InferenceRule>(serialized.as_str()).unwrap(),
+            rule
+        )
+    }
+
+    #[test]
+    fn serde_additional_info() {
+        let rule = r#"
+rule:
+    antecedent:
+        - (( A ∧ B ))
+    consequent: (( B ∧ A ))
+name: Example
+bla: Blub
+"#;
+        println!(
+            "{:#?}",
+            serde_yaml::from_str::<InferenceRule>(rule).unwrap()
+        );
     }
 }

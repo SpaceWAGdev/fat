@@ -1,8 +1,11 @@
 pub mod parser;
 use comemo::memoize;
+use serde::{Deserialize, Deserializer, Serialize, de::Visitor};
 use std::{collections::HashMap, fmt::Display};
 
 use anyhow::{Result, bail};
+
+use crate::ast::parser::parse_expression;
 
 #[derive(Debug, Clone, Hash, PartialOrd)]
 pub enum Expression {
@@ -146,6 +149,41 @@ impl Expression {
     }
 }
 
+impl Serialize for Expression {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(format!("({})", self).as_str())
+    }
+}
+
+struct ExprVisitor;
+impl<'de> Visitor<'de> for ExprVisitor {
+    type Value = Expression;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(formatter, "An expression to be parsed by FAT")
+    }
+
+    fn visit_str<E>(self, v: &str) -> std::result::Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        parse_expression(v)
+            .map_err(|e| E::custom(format!("invalid logical expression: {}", e.message)))
+    }
+}
+
+impl<'de> Deserialize<'de> for Expression {
+    fn deserialize<D>(deserializer: D) -> Result<Expression, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_str(ExprVisitor)
+    }
+}
+
 impl PartialEq for Expression {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -182,7 +220,7 @@ impl Display for Expression {
             Expression::Literal(value) => write!(f, "{value}"),
             Expression::Negation(expression) => write!(f, "¬{expression}"),
             Expression::BinaryRelation { lhs, relation, rhs } => {
-                write!(f, "{lhs} {relation} {rhs}")
+                write!(f, "( {lhs} {relation} {rhs} )")
             }
         }
     }
@@ -190,7 +228,9 @@ impl Display for Expression {
 
 #[cfg(test)]
 mod tests {
-    use crate::ast::parser::parse_expression;
+    use std::collections::HashMap;
+
+    use crate::ast::{Expression, parser::parse_expression, tests};
 
     #[test]
     fn commutative_equality() {
@@ -198,5 +238,27 @@ mod tests {
             parse_expression("AvB").unwrap(),
             parse_expression("BvA").unwrap()
         )
+    }
+
+    #[test]
+    fn alpha_conversion() {
+        let mut replacement = HashMap::<String, Expression>::new();
+        replacement.insert("A".into(), parse_expression("X->Y").unwrap());
+        assert_eq!(
+            parse_expression("AvB")
+                .unwrap()
+                .alpha_replace_all(&replacement),
+            parse_expression("(X->Y)vB").unwrap()
+        )
+    }
+
+    #[test]
+    fn serde() {
+        let expr = parse_expression("(AvB) -> C").unwrap();
+        let serialized = serde_yaml::to_string(&expr).unwrap();
+        assert_eq!(
+            serde_yaml::from_str::<Expression>(serialized.as_str()).unwrap(),
+            expr
+        );
     }
 }
