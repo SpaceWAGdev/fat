@@ -152,7 +152,7 @@ fn parse_proof_step(line: ProofLine, proof: &String) -> Result<ProofStep> {
 pub fn parse_proof(proof: String, starting_point: Option<usize>) -> Result<Proof> {
     let lines: Vec<&str> = proof
         .lines()
-        .filter(|line| !line.trim().starts_with("#"))
+        // .filter(|line| !line.trim().starts_with("#")) // comments aren't allowed til i switch to a proper parsing system for proos
         .collect();
 
     let conclusion: usize;
