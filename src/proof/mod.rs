@@ -91,11 +91,11 @@ fn parse_numeric_references(line: &str) -> (Vec<usize>, Vec<usize>) {
     for segment in line.split(",") {
         if segment.trim().starts_with("(") {
             let cleaned = segment.trim_matches(['(', ')']);
-            if let Ok(num) = cleaned.parse() {
-                assumption_removals.push(num)
+            if let Ok(num) = cleaned.parse::<usize>() {
+                assumption_removals.push(num - 1)
             }
-        } else if let Ok(num) = segment.trim().parse() {
-            refs.push(num)
+        } else if let Ok(num) = segment.trim().parse::<usize>() {
+            refs.push(num - 1)
         }
     }
 
@@ -150,7 +150,10 @@ fn parse_proof_step(line: ProofLine, proof: &String) -> Result<ProofStep> {
 }
 
 pub fn parse_proof(proof: String, starting_point: Option<usize>) -> Result<Proof> {
-    let lines: Vec<&str> = proof.lines().collect();
+    let lines: Vec<&str> = proof
+        .lines()
+        .filter(|line| !line.trim().starts_with("#"))
+        .collect();
 
     let conclusion: usize;
 
