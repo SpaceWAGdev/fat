@@ -1,13 +1,16 @@
 pub mod parser;
 use comemo::memoize;
 use serde::{Deserialize, Deserializer, Serialize, de::Visitor};
-use std::{collections::HashMap, fmt::Display};
+use std::{
+    collections::HashMap,
+    fmt::{Debug, Display},
+};
 
 use anyhow::{Result, bail};
 
 use crate::{AsLaTeX, ast::parser::parse_expression};
 
-#[derive(Debug, Clone, Hash, PartialOrd)]
+#[derive(Clone, Hash, PartialOrd)]
 pub enum Expression {
     Variable(String),
     Literal(String),
@@ -254,6 +257,12 @@ impl AsLaTeX for Expression {
                 )
             }
         })
+    }
+}
+
+impl Debug for Expression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self}")
     }
 }
 
