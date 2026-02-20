@@ -177,11 +177,25 @@ pub fn parse_proof(proof: String, starting_point: Option<usize>) -> Result<Proof
     });
 }
 
+impl AsLaTeX for ProofStep {
+    fn as_latex(&self) -> anyhow::Result<String> {
+        Ok(match self {
+            ProofStep::Axiom(expression) => format!("\\AxiomC{{ {} }}", expression.as_latex()?),
+            ProofStep::Subproof(proof) => todo!(),
+            ProofStep::Inference {
+                antecedents: _,
+                expression: _,
+                rule_name: _,
+            } => Inference::try_from(self)?.as_latex()?,
+        })
+    }
+}
+
 impl AsLaTeX for Proof {
     fn as_latex(&self) -> anyhow::Result<String> {
         Ok(format!(
             "\\begin{{prooftree}}\n {} \\end{{prooftree}}",
-            self.conclusion().as_latex()?,
+            self.conclusion.as_latex()?,
         ))
     }
 }
