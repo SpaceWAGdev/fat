@@ -181,7 +181,7 @@ mod tests {
     #[test]
     fn basic_parse() {
         let raw = r#"Ax | A |
-Ax | B | 0 QED
+Ax | B | 1 QED
 "#;
         let proof = parse_proof(raw.to_string(), None).unwrap();
         if let ProofStep::Axiom(_) = proof.conclusion {
@@ -193,7 +193,7 @@ Ax | B | 0 QED
     #[test]
     fn validate() {
         let raw = r#"Ax | A |
-        Example | B | 0 QED
+        Example | B | 1 QED
         "#;
         let proof = parse_proof(raw.to_string(), None).unwrap();
         let rules = vec![InferenceRule {
