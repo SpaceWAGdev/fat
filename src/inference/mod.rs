@@ -4,13 +4,13 @@ use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, iter::zip};
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct Inference {
     pub antecedent: Vec<Expression>,
     pub consequent: Box<Expression>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct InferenceRule {
     pub rule: Inference,
     pub name: String,
@@ -141,6 +141,8 @@ mod tests {
 
         let serialized = serde_yaml::to_string(&rule).unwrap();
         println!("{serialized}");
+        let rule_vec = vec![rule.clone(), rule.clone()];
+        println!("{}", serde_yaml::to_string(&rule_vec).unwrap());
         assert_eq!(
             serde_yaml::from_str::<InferenceRule>(serialized.as_str()).unwrap(),
             rule

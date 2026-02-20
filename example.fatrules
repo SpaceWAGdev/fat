@@ -1,6 +1,6 @@
-rule:
-  antecedent:
-  - ((X->Y))
-  - (X)
-  consequent: (Y)
-name: MP
+- rule:
+    antecedent:
+    - (A -> B)
+    - (A)
+    consequent: (B)
+  name: MP
