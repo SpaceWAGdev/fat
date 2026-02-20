@@ -108,7 +108,7 @@ impl AsLaTeX for InferenceRule {
     fn as_latex(&self) -> anyhow::Result<String> {
         let rule_latex = self.rule.as_latex()?;
         let mut lines = rule_latex.split("\n").collect_vec();
-        let name = format!("\\RL{{ {} }}", self.name);
+        let name = format!("\\RL{{$ {} $}}", self.name);
         lines.insert(lines.len() - 2, name.as_str());
         Ok(lines.join("\n"))
     }
@@ -117,27 +117,27 @@ impl AsLaTeX for InferenceRule {
 impl AsLaTeX for Inference {
     fn as_latex(&self) -> anyhow::Result<String> {
         Ok(match self.antecedent.len() {
-            0 => format!("\\AXC{{ {} }}\n", self.consequent.as_latex()?), // zero-argument inferences are assumed as axioms in tree display, even though they aren't when validating
+            0 => format!("\\AXC{{$ {} $}}\n", self.consequent.as_latex()?), // zero-argument inferences are assumed as axioms in tree display, even though they aren't when validating
             1 => format!(
-                "{}\n\\UIC{{{}}}\n",
+                "{}\n\\UIC{{${}$}}\n",
                 self.antecedent[0].as_latex()?,
                 self.consequent.as_latex()?
             ),
             2 => format!(
-                "{}\n{}\n\\BIC{{{}}}\n",
+                "{}\n{}\n\\BIC{{${}$}}\n",
                 self.antecedent[0].as_latex()?,
                 self.antecedent[1].as_latex()?,
                 self.consequent.as_latex()?
             ),
             3 => format!(
-                "{}\n{}\n{}\n\\TIC{{{}}}\n",
+                "{}\n{}\n{}\n\\TIC{{${}$}}\n",
                 self.antecedent[0].as_latex()?,
                 self.antecedent[1].as_latex()?,
                 self.antecedent[2].as_latex()?,
                 self.consequent.as_latex()?
             ),
             4 => format!(
-                "{}\n{}\n{}\n{}\n\\QuaternaryInfC{{{}}}\n",
+                "{}\n{}\n{}\n{}\n\\QuaternaryInfC{{${}$}}\n",
                 self.antecedent[0].as_latex()?,
                 self.antecedent[1].as_latex()?,
                 self.antecedent[2].as_latex()?,
@@ -145,7 +145,7 @@ impl AsLaTeX for Inference {
                 self.consequent.as_latex()?
             ),
             5 => format!(
-                "{}\n{}\n{}\n{}\n{}\n\\QuinaryInfC{{{}}}\n",
+                "{}\n{}\n{}\n{}\n{}\n\\QuinaryInfC{{${}$}}\n",
                 self.antecedent[0].as_latex()?,
                 self.antecedent[1].as_latex()?,
                 self.antecedent[2].as_latex()?,

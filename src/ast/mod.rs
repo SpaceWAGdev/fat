@@ -244,10 +244,10 @@ impl AsLaTeX for Expression {
         Ok(match self {
             Expression::Variable(v) => v.to_string(),
             Expression::Literal(_) => todo!(),
-            Expression::Negation(expression) => format!("$\\neg {}$", expression.as_latex()?),
+            Expression::Negation(expression) => format!("\\neg {}", expression.as_latex()?),
             Expression::BinaryRelation { lhs, relation, rhs } => {
                 format!(
-                    "$ ({} {} {}) $",
+                    "({} {} {})",
                     lhs.as_latex()?,
                     relation.as_latex()?,
                     rhs.as_latex()?
