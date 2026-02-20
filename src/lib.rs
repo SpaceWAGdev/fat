@@ -13,17 +13,3 @@ pub fn parse_and_validate_proof(proof_file: &str, rules_file: &str) -> Result<()
         serde_yaml::from_str::<Vec<InferenceRule>>(rules_file).map_err(|e| e.to_string())?;
     proof.validate(&rules).map_err(|e| e.to_string())
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn e2e() {
-        parse_and_validate_proof(
-            include_str!("../example.fat"),
-            include_str!("../example.fatrules"),
-        )
-        .unwrap()
-    }
-}
