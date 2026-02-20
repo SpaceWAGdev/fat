@@ -119,25 +119,25 @@ impl AsLaTeX for Inference {
         Ok(match self.antecedent.len() {
             0 => format!("\\AXC{{ {} }}\n", self.consequent.as_latex()?), // zero-argument inferences are assumed as axioms in tree display, even though they aren't when validating
             1 => format!(
-                "{}\n\\UIC{{ {} }}\n",
+                "{}\n\\UIC{{{}}}\n",
                 self.antecedent[0].as_latex()?,
                 self.consequent.as_latex()?
             ),
             2 => format!(
-                "{}\n{}\n\\BIC{{ {} }}\n",
+                "{}\n{}\n\\BIC{{{}}}\n",
                 self.antecedent[0].as_latex()?,
                 self.antecedent[1].as_latex()?,
                 self.consequent.as_latex()?
             ),
             3 => format!(
-                "{}\n{}\n{}\n\\BIC{{ {} }}\n",
+                "{}\n{}\n{}\n\\BIC{{{}}}\n",
                 self.antecedent[0].as_latex()?,
                 self.antecedent[1].as_latex()?,
                 self.antecedent[2].as_latex()?,
                 self.consequent.as_latex()?
             ),
             4 => format!(
-                "{}\n{}\n{}\n{}\n\\QuaternaryInfC{{ {} }}\n",
+                "{}\n{}\n{}\n{}\n\\QuaternaryInfC{{{}}}\n",
                 self.antecedent[0].as_latex()?,
                 self.antecedent[1].as_latex()?,
                 self.antecedent[2].as_latex()?,
@@ -145,7 +145,7 @@ impl AsLaTeX for Inference {
                 self.consequent.as_latex()?
             ),
             5 => format!(
-                "{}\n{}\n{}\n{}\n{}\n\\QuinaryInfC{{ {} }}\n",
+                "{}\n{}\n{}\n{}\n{}\n\\QuinaryInfC{{{}}}\n",
                 self.antecedent[0].as_latex()?,
                 self.antecedent[1].as_latex()?,
                 self.antecedent[2].as_latex()?,

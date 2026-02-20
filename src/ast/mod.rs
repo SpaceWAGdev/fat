@@ -247,7 +247,7 @@ impl AsLaTeX for Expression {
             Expression::Negation(expression) => format!("\\neg {}", expression.as_latex()?),
             Expression::BinaryRelation { lhs, relation, rhs } => {
                 format!(
-                    "{} {} {}",
+                    "( {} {} {} )",
                     lhs.as_latex()?,
                     relation.as_latex()?,
                     rhs.as_latex()?

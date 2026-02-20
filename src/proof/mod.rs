@@ -180,7 +180,7 @@ pub fn parse_proof(proof: String, starting_point: Option<usize>) -> Result<Proof
 impl AsLaTeX for ProofStep {
     fn as_latex(&self) -> anyhow::Result<String> {
         Ok(match self {
-            ProofStep::Axiom(expression) => format!("\\AxiomC{{ {} }}", expression.as_latex()?),
+            ProofStep::Axiom(expression) => format!("\\AxiomC{{{}}}\n", expression.as_latex()?),
             ProofStep::Subproof(proof) => todo!(),
             ProofStep::Inference {
                 antecedents: _,
@@ -194,7 +194,7 @@ impl AsLaTeX for ProofStep {
 impl AsLaTeX for Proof {
     fn as_latex(&self) -> anyhow::Result<String> {
         Ok(format!(
-            "\\begin{{prooftree}}\n {} \\end{{prooftree}}",
+            "\\begin{{prooftree}}\n{}\n\\end{{prooftree}}",
             self.conclusion.as_latex()?,
         ))
     }
