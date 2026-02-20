@@ -1,0 +1,4 @@
+RA:
+  premises: ["A->B", "A->!B"]
+  conclusion: ["!A"]
+  long_name: "Reductio ad Absurdum"

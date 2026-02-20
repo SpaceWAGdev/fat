@@ -7,10 +7,10 @@ use std::{fmt::Display, sync::LazyLock};
 
 use crate::ast::{BinaryRelation, Expression};
 #[derive(pest_derive::Parser)]
-#[grammar = "proplog.pest"]
-struct FatParser;
+#[grammar = "fatexpr.pest"]
+pub struct FatParser;
 
-static PRATT_PARSER: LazyLock<PrattParser<Rule>> = LazyLock::new(|| {
+pub(crate) static PRATT_PARSER: LazyLock<PrattParser<Rule>> = LazyLock::new(|| {
     use Rule::*;
     use pest::pratt_parser::{Assoc::*, Op};
 
@@ -111,6 +111,30 @@ mod tests {
                 relation: BinaryRelation::Or,
                 rhs: Box::new(Expression::Variable("B".to_string()))
             }
+        )
+    }
+
+    #[test]
+    fn reject_double_negation() {
+        match parse_expression("!!!(AvB) <-> (A^B) -> (⊤v⊥)") {
+            Ok(res) => print!("{}", res),
+            Err(e) => println!("{}", e),
+        }
+    }
+
+    #[test]
+    fn all_symbols_nothrow() {
+        println!(
+            "{}",
+            parse_expression("(AvB) ^ (B>-<C) <-> (!A -> B) ").unwrap()
+        );
+    }
+
+    #[test]
+    fn multiple_associativity() {
+        assert_eq!(
+            parse_expression("A v B v C v D").unwrap(),
+            parse_expression("(((A v B) v C) v D)").unwrap()
         )
     }
 }
