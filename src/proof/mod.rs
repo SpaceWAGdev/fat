@@ -183,10 +183,31 @@ impl AsLaTeX for ProofStep {
             ProofStep::Axiom(expression) => format!("\\AxiomC{{{}}}\n", expression.as_latex()?),
             ProofStep::Subproof(proof) => todo!(),
             ProofStep::Inference {
-                antecedents: _,
-                expression: _,
-                rule_name: _,
-            } => Inference::try_from(self)?.as_latex()?,
+                antecedents,
+                expression,
+                rule_name,
+            } => {
+                let mut out: Vec<String> = Vec::new();
+                let cmd = match antecedents.len() {
+                    1 => "UIC",
+                    2 => "BIC",
+                    3 => "TIC",
+                    4 => "QuaternaryInfC",
+                    5 => "QuinaryInfC",
+                    _ => {
+                        bail!("Can't construct a tree representation for more than 5 antecedents.")
+                    }
+                };
+
+                for antecedent in antecedents {
+                    out.push(antecedent.as_latex()?);
+                }
+
+                out.push("\n".into());
+                out.push(format!("\\RL{{{}}}\n", rule_name));
+                out.push(format!("\\{cmd}{{{}}}\n", expression.as_latex()?));
+                out.join("\n")
+            }
         })
     }
 }

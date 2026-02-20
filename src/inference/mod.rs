@@ -130,7 +130,7 @@ impl AsLaTeX for Inference {
                 self.consequent.as_latex()?
             ),
             3 => format!(
-                "{}\n{}\n{}\n\\BIC{{{}}}\n",
+                "{}\n{}\n{}\n\\TIC{{{}}}\n",
                 self.antecedent[0].as_latex()?,
                 self.antecedent[1].as_latex()?,
                 self.antecedent[2].as_latex()?,
