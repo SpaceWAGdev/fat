@@ -145,7 +145,9 @@ impl Expression {
         match self {
             Expression::Variable(_) => self,
             Expression::Literal(_) => self,
-            Expression::Negation(argument) => argument.order_lexicographically(),
+            Expression::Negation(argument) => {
+                Self::Negation(Box::new(argument.order_lexicographically()))
+            }
             Expression::BinaryRelation {
                 lhs: ref orig_lhs,
                 relation,

@@ -2,7 +2,7 @@ use crate::{AsLaTeX, ast::Expression, proof::ProofStep};
 use anyhow::{Result, bail};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fmt::format, iter::zip};
+use std::{collections::HashMap, iter::zip};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct Inference {
