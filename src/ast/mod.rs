@@ -153,7 +153,7 @@ impl Expression {
                 relation,
                 rhs: ref orig_rhs,
             } => {
-                if relation.commutative() && orig_lhs < orig_rhs {
+                if relation.commutative() && orig_lhs > orig_rhs {
                     return Self::BinaryRelation {
                         lhs: orig_rhs.to_owned(),
                         relation,
