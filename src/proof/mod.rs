@@ -1,5 +1,3 @@
-use std::fmt::format;
-
 use crate::{
     AsLaTeX,
     ast::{self, Expression},
@@ -107,7 +105,11 @@ fn parse_numeric_references(line: &str) -> (Vec<usize>, Vec<usize>) {
 
 fn parse_proofline(line: &str, number: usize) -> Result<ProofLine<'_>> {
     let segments: Vec<&str> = line.split("|").collect();
-    ensure!(segments.len() == 3, "Proof line {number} is ill-formed.");
+    ensure!(
+        segments.len() == 3,
+        "Proof line {} is ill-formed.",
+        number + 1
+    );
 
     let (refs, assumption_removals) = parse_numeric_references(segments[2]);
     let expr = format!("({})", segments[1].trim());
@@ -123,7 +125,7 @@ fn parse_proofline(line: &str, number: usize) -> Result<ProofLine<'_>> {
 fn parse_proof_step(line: ProofLine, proof: &String) -> Result<ProofStep> {
     match line.rulename {
         // assumption introductions are treated as axioms for now
-        "Ax" | "An" => Ok(ProofStep::Axiom(ast::parser::parse_expression(
+        "Ax" | "An" | "Pr" => Ok(ProofStep::Axiom(ast::parser::parse_expression(
             line.expression.as_str(),
         )?)),
         "AnB" => Ok(ProofStep::Subproof(Box::new(parse_proof(
@@ -165,7 +167,7 @@ pub fn parse_proof(proof: String, starting_point: Option<usize>) -> Result<Proof
     } else {
         conclusion = lines
             .iter()
-            .position(|line| line.ends_with("QED"))
+            .position(|line| line.trim().ends_with("QED"))
             .ok_or_else(|| anyhow::format_err!("Proof has no conclusion."))?;
     }
 
