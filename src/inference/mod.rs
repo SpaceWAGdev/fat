@@ -1,5 +1,5 @@
 use crate::{AsLaTeX, ast::Expression, proof::ProofStep};
-use anyhow::{Result, bail};
+use anyhow::{Ok, Result, bail};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, iter::zip};
@@ -71,6 +71,9 @@ impl Inference {
     pub fn validate(&self, rule: &InferenceRule) -> Result<()> {
         // TODO: Maybe convert the variables to an easily-comparable type (i.e. not String) for checking inferences?
         // Complexity sort of explodes with all the Vec.sorts()...
+        if *self.consequent == Expression::Literal("⊤".into()) {
+            return Ok(());
+        }
 
         let mappings = self.harvest_variables(&rule.rule)?;
 
