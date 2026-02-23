@@ -90,7 +90,10 @@ impl Inference {
             .antecedent
             .iter()
             .zip(rule.rule.antecedent.iter())
-            .all(|(oa, ma)| *oa == ma.clone().alpha_replace_all(&mappings))
+            .all(|(oa, ma)| {
+                ma == &Expression::Literal("⊤".into())
+                    || *oa == ma.clone().alpha_replace_all(&mappings)
+            })
         {
             bail!(
                 "{:?} does not follow from {:?} using {}",
@@ -164,7 +167,7 @@ mod tests {
     use std::vec;
 
     use super::*;
-    use crate::ast;
+    use crate::ast::{self, parser::parse_expression};
 
     #[test]
     fn basic_inference() {
@@ -235,5 +238,17 @@ bla: Blub
                 .as_latex()
                 .unwrap()
         );
+    }
+
+    #[test]
+    fn literal_equality() {
+        assert_eq!(
+            parse_expression("⊤").unwrap(),
+            parse_expression("⊤").unwrap()
+        );
+        assert_eq!(
+            &parse_expression("⊤").unwrap(),
+            &parse_expression("⊤").unwrap()
+        )
     }
 }
