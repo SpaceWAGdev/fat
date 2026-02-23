@@ -71,9 +71,15 @@ impl Inference {
     pub fn validate(&self, rule: &InferenceRule) -> Result<()> {
         // TODO: Maybe convert the variables to an easily-comparable type (i.e. not String) for checking inferences?
         // Complexity sort of explodes with all the Vec.sorts()...
-        if *self.consequent == Expression::Literal("⊤".into()) {
+        if *self.consequent == Expression::Literal("⊤".into())
+            || rule
+                .rule
+                .antecedent
+                .iter()
+                .all(|ma| ma == &Expression::Literal("⊤".into()))
+        {
             return Ok(());
-        }
+        } // do this before trying to harvest variables
 
         let mappings = self.harvest_variables(&rule.rule)?;
 
@@ -93,10 +99,7 @@ impl Inference {
             .antecedent
             .iter()
             .zip(rule.rule.antecedent.iter())
-            .all(|(oa, ma)| {
-                ma == &Expression::Literal("⊤".into())
-                    || *oa == ma.clone().alpha_replace_all(&mappings)
-            })
+            .all(|(oa, ma)| *oa == ma.clone().alpha_replace_all(&mappings))
         {
             bail!(
                 "{:?} does not follow from {:?} using {}",
