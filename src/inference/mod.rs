@@ -52,35 +52,31 @@ impl Inference {
     fn harvest_variables(&self, rule: &Self) -> Result<HashMap<String, Expression>> {
         let mut ret: HashMap<String, Expression> = HashMap::new();
 
-        for (oexpr, mexpr) in zip(&self.antecedent, &rule.antecedent) {
-            ret = ret
-                .into_iter()
-                .merge(Expression::harvest_variables(oexpr, mexpr)?)
-                .collect();
+        if !(rule
+            .antecedent
+            .iter()
+            .all(|ma| ma == &Expression::Literal("⊤".into())))
+        {
+            for (oexpr, mexpr) in zip(&self.antecedent, &rule.antecedent) {
+                ret = ret
+                    .into_iter()
+                    .merge(Expression::harvest_variables(oexpr, mexpr)?)
+                    .collect();
+            }
         }
 
-        ret = ret
-            .into_iter()
-            .merge(self.consequent.harvest_variables(&rule.consequent)?)
-            .collect();
-        // ret.sort();
-        // ret.dedup();
+        if *rule.consequent != Expression::Literal("⊤".into()) {
+            ret = ret
+                .into_iter()
+                .merge(self.consequent.harvest_variables(&rule.consequent)?)
+                .collect();
+        }
         Ok(ret)
     }
 
     pub fn validate(&self, rule: &InferenceRule) -> Result<()> {
         // TODO: Maybe convert the variables to an easily-comparable type (i.e. not String) for checking inferences?
         // Complexity sort of explodes with all the Vec.sorts()...
-        if *self.consequent == Expression::Literal("⊤".into())
-            || rule
-                .rule
-                .antecedent
-                .iter()
-                .all(|ma| ma == &Expression::Literal("⊤".into()))
-        {
-            return Ok(());
-        } // do this before trying to harvest variables
-
         let mappings = self.harvest_variables(&rule.rule)?;
 
         let alpha_replaced_consquent = rule.rule.consequent.clone().alpha_replace_all(&mappings);
@@ -99,7 +95,10 @@ impl Inference {
             .antecedent
             .iter()
             .zip(rule.rule.antecedent.iter())
-            .all(|(oa, ma)| *oa == ma.clone().alpha_replace_all(&mappings))
+            .all(|(oa, ma)| {
+                (*oa == ma.clone().alpha_replace_all(&mappings))
+                    || (ma == &Expression::Literal("⊤".into()))
+            })
         {
             bail!(
                 "{:?} does not follow from {:?} using {}",
@@ -211,6 +210,20 @@ mod tests {
             serde_yaml::from_str::<InferenceRule>(serialized.as_str()).unwrap(),
             rule
         )
+    }
+    #[test]
+    fn serde_literals() {
+        let rule = r#"
+    rule:
+        antecedent:
+            - (⊤)
+        consequent: (A)
+    name: Example
+    "#;
+        println!(
+            "{:#?}",
+            serde_yaml::from_str::<InferenceRule>(rule).unwrap()
+        );
     }
 
     #[test]
