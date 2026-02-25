@@ -1,5 +1,6 @@
 use anyhow::{Result, bail};
 use comemo::memoize;
+use itertools::Itertools;
 use pest::Parser;
 use pest::iterators::Pairs;
 use pest::pratt_parser::PrattParser;
@@ -59,7 +60,9 @@ fn parse_proposition(pairs: Pairs<Rule>) -> Result<Expression> {
         .map_primary(|primary| {
             Ok(match primary.as_rule() {
                 Rule::literal => Expression::Literal(primary.to_string()), // TODO: Check if to_string() and as_str() work the same way here
-                Rule::variable => Expression::Variable(primary.to_string()),
+                Rule::variable => {
+                    Expression::Variable(primary.to_string().chars().collect_vec()[0])
+                }
                 Rule::prop => parse_proposition(primary.into_inner())?,
                 rule => bail!("Expr::parse expected atom, found {:?}", rule),
             })
@@ -112,9 +115,9 @@ mod tests {
         assert_eq!(
             parse_expression("AvB").unwrap(),
             Expression::BinaryRelation {
-                lhs: Box::new(Expression::Variable("A".to_string())),
+                lhs: Box::new(Expression::Variable('A')),
                 relation: BinaryRelation::Or,
-                rhs: Box::new(Expression::Variable("B".to_string()))
+                rhs: Box::new(Expression::Variable('B'))
             }
         )
     }

@@ -12,7 +12,7 @@ use crate::{AsLaTeX, ast::parser::parse_expression};
 
 #[derive(Clone, Hash, PartialOrd)]
 pub enum Expression {
-    Variable(String),
+    Variable(char),
     Literal(String),
     Negation(Box<Expression>),
     BinaryRelation {
@@ -72,12 +72,12 @@ impl BinaryRelation {
 }
 
 impl Expression {
-    pub fn harvest_variables(&self, metaexpression: &Self) -> Result<HashMap<String, Expression>> {
-        let mut ret: HashMap<String, Expression> = HashMap::new();
+    pub fn harvest_variables(&self, metaexpression: &Self) -> Result<HashMap<char, Expression>> {
+        let mut ret: HashMap<char, Expression> = HashMap::new();
 
         match (metaexpression, self) {
             (Expression::Variable(name), _) => {
-                ret.insert(name.to_owned(), self.clone());
+                ret.insert(*name, self.clone());
             }
             (Expression::Negation(m_argument), Expression::Negation(o_argument)) => {
                 ret.extend(o_argument.harvest_variables(m_argument)?);
@@ -119,7 +119,7 @@ impl Expression {
         Ok(ret)
     }
 
-    pub fn alpha_replace_all(self, replacements: &HashMap<String, Self>) -> Self {
+    pub fn alpha_replace_all(self, replacements: &HashMap<char, Self>) -> Self {
         match self {
             Expression::Variable(ref name) => {
                 if let Some(new) = replacements.get(name) {
@@ -284,8 +284,8 @@ mod tests {
 
     #[test]
     fn alpha_conversion() {
-        let mut replacement = HashMap::<String, Expression>::new();
-        replacement.insert("A".into(), parse_expression("X->Y").unwrap());
+        let mut replacement = HashMap::<char, Expression>::new();
+        replacement.insert('A', parse_expression("X->Y").unwrap());
         assert_eq!(
             parse_expression("AvB")
                 .unwrap()

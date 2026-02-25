@@ -49,8 +49,8 @@ impl TryFrom<&ProofStep> for Inference {
 }
 
 impl Inference {
-    fn harvest_variables(&self, rule: &Self) -> Result<HashMap<String, Expression>> {
-        let mut ret: HashMap<String, Expression> = HashMap::new();
+    fn harvest_variables(&self, rule: &Self) -> Result<HashMap<char, Expression>> {
+        let mut ret: HashMap<char, Expression> = HashMap::new();
 
         if !(rule
             .antecedent
