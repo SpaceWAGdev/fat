@@ -1,7 +1,7 @@
 use crate::{
-    AsLaTeX,
     ast::{self, Expression},
     inference::{Inference, InferenceRule},
+    render::AsLaTeX,
 };
 use anyhow::{Result, bail, ensure};
 use itertools::Itertools;

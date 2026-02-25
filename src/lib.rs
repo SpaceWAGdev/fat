@@ -1,17 +1,12 @@
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::inference::InferenceRule;
+use crate::render::AsLaTeX;
 
 mod ast;
 pub mod inference;
 pub mod proof;
-
-pub trait AsLaTeX {
-    fn as_latex(&self) -> anyhow::Result<String>;
-}
-pub trait AsTypst {
-    fn as_latex(&self) -> anyhow::Result<String>;
-}
+pub mod render;
 
 #[wasm_bindgen]
 pub fn parse_and_validate_proof(proof_file: &str, rules_file: &str) -> Result<(), String> {

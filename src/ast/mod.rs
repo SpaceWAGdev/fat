@@ -8,7 +8,7 @@ use std::{
 
 use anyhow::{Result, bail};
 
-use crate::{AsLaTeX, ast::parser::parse_expression};
+use crate::{ast::parser::parse_expression, render::AsLaTeX};
 
 #[derive(Clone, Hash, PartialOrd)]
 pub enum Expression {
@@ -238,7 +238,7 @@ impl Display for Expression {
             Expression::Literal(value) => write!(f, "{value}"),
             Expression::Negation(expression) => write!(f, "¬{expression}"),
             Expression::BinaryRelation { lhs, relation, rhs } => {
-                write!(f, "( {lhs} {relation} {rhs} )")
+                write!(f, "({lhs} {relation} {rhs})")
             }
         }
     }
@@ -252,7 +252,7 @@ impl AsLaTeX for Expression {
             Expression::Negation(expression) => format!("\\neg {}", expression.as_latex()?),
             Expression::BinaryRelation { lhs, relation, rhs } => {
                 format!(
-                    "({} {} {})",
+                    "{} {} {}",
                     lhs.as_latex()?,
                     relation.as_latex()?,
                     rhs.as_latex()?

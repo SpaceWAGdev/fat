@@ -1,4 +1,8 @@
-use crate::{AsLaTeX, ast::Expression, proof::ProofStep};
+use crate::{
+    ast::Expression,
+    proof::ProofStep,
+    render::{self, AsLaTeX},
+};
 use anyhow::{Ok, Result, bail};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
@@ -116,7 +120,10 @@ impl AsLaTeX for InferenceRule {
     fn as_latex(&self) -> anyhow::Result<String> {
         let rule_latex = self.rule.as_latex()?;
         let mut lines = rule_latex.split("\n").collect_vec();
-        let name = format!("\\RL{{$ {} $}}", self.name);
+        let name = format!(
+            "\\RL{{ {} }}",
+            render::latex::escape_logic_symbols(self.name.as_str())
+        );
         lines.insert(lines.len() - 2, name.as_str());
         Ok(lines.join("\n"))
     }
