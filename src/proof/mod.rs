@@ -1,7 +1,7 @@
 use crate::{
     ast::{self, Expression},
     inference::{Inference, InferenceRule},
-    render::AsLaTeX,
+    render::{AsLaTeX, latex},
 };
 use anyhow::{Result, bail, ensure};
 use itertools::Itertools;
@@ -206,7 +206,10 @@ impl AsLaTeX for ProofStep {
                 }
 
                 out.push("\n".into());
-                out.push(format!("\\RL{{${}$}}\n", rule_name));
+                out.push(format!(
+                    "\\RL{{${}$}}\n",
+                    latex::escape_logic_symbols(rule_name)
+                ));
                 out.push(format!("\\{cmd}{{${}$}}\n", expression.as_latex()?));
                 out.join("\n")
             }
