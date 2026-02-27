@@ -3,7 +3,7 @@ use crate::{
     inference::{Inference, InferenceRule},
     render::{AsLaTeX, latex},
 };
-use anyhow::{Result, bail, ensure};
+use anyhow::{Result, bail, ensure, format_err};
 use itertools::Itertools;
 
 #[derive(Debug)]
@@ -125,7 +125,7 @@ fn parse_proofline(line: &str, number: usize) -> Result<ProofLine<'_>> {
 fn parse_proof_step(line: ProofLine, proof: &String) -> Result<ProofStep> {
     match line.rulename {
         // assumption introductions are treated as axioms for now
-        "Ax" | "An" | "Pr" => Ok(ProofStep::Axiom(ast::parser::parse_expression(
+        "Ax" | "An" | "Pr" | "Ass" => Ok(ProofStep::Axiom(ast::parser::parse_expression(
             line.expression.as_str(),
         )?)),
         "AnB" => Ok(ProofStep::Subproof(Box::new(parse_proof(
@@ -147,7 +147,9 @@ fn parse_proof_step(line: ProofLine, proof: &String) -> Result<ProofStep> {
 
             Ok(ProofStep::Inference {
                 antecedents: ante,
-                expression: ast::parser::parse_expression(line.expression.as_str())?,
+                expression: ast::parser::parse_expression(line.expression.as_str()).map_err(
+                    |e| format_err!("Error on line {} : {}", line.number + 1, e.message),
+                )?,
                 rule_name: line.rulename.to_owned(),
             })
         }

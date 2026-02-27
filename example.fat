@@ -1,9 +1,10 @@
-An  | A^B -> C    |
-An  |  ⊤           |
-AA  | C -> (¬B v C) | 2
-AE  | ¬C          | 2
-WL  | ¬(A^B)      | 1,4
-KS  | ¬B          | 2,5
-vE  | ¬BvC        | 2,5
-->E | ¬C -> (¬B v C) | 4,7
-KD  | ¬B v  C     | 3, 8 QED
+An   | (A^B) -> C     |
+An   | A              |
+AA   | C -> (¬B v C)  | 2
+An   | ¬C             | 2
+WL.1 | ¬(A^B)         | 1,4
+DL.5.b | A -> ¬B      | 5
+->B  | ¬B             | 6, 2
+vE   | ¬BvC           | 7
+->E  | ¬C -> (¬B v C) | 4,8
+KD   | ¬B v C         | 3, 9 QED

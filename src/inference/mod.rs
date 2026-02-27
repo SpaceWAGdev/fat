@@ -79,8 +79,6 @@ impl Inference {
     }
 
     pub fn validate(&self, rule: &InferenceRule) -> Result<()> {
-        // TODO: Maybe convert the variables to an easily-comparable type (i.e. not String) for checking inferences?
-        // Complexity sort of explodes with all the Vec.sorts()...
         let mappings = self.harvest_variables(&rule.rule)?;
 
         let alpha_replaced_consquent = rule.rule.consequent.clone().alpha_replace_all(&mappings);
